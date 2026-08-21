@@ -1,75 +1,75 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Colleage — Study Smarter</title>
-  <meta name="description" content="A responsive student study platform with subjects, schedules, study rooms, community, and analytics." />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Colleage — Study Workspace</title>
+  <meta name="description" content="A focused study workspace for courses, subjects, schedules, study rooms and community.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="core.css">
+  <link rel="stylesheet" href="responsive-nav.css">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand-row">
-        <div class="brand-mark">C</div>
-        <div>
-          <div class="brand">Colleage</div>
-          <div class="brand-sub">Study workspace</div>
-        </div>
-      </div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand-row">
+      <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5 12 2l8 3.5-8 3.5L4 5.5Z"/><path d="M6.5 8.5V14c0 1.5 2.5 3 5.5 3s5.5-1.5 5.5-3V8.5"/><path d="M20 6v6"/></svg></div>
+      <div><div class="brand">Colleage</div><div class="brand-sub">Study workspace</div></div>
+    </div>
+    <div class="sidebar-note">
+      <strong>Focused workspace</strong>
+      <span>Course content, planning and collaboration.</span>
+    </div>
+    <div class="sidebar-spacer"></div>
+    <div class="profile-card">
+      <div class="avatar" id="profileAvatar">G</div>
+      <div class="profile-copy"><strong id="profileName">Guest</strong><span id="roleLabel">Not signed in</span></div>
+    </div>
+    <button class="side-link" id="profileLink"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span> Profile</button>
+  </aside>
 
-      <nav class="side-nav" aria-label="Services">
-        <p class="nav-caption">Explore</p>
-        <button class="side-link" data-side="jobs"><span>⌁</span> Find a work</button>
-        <button class="side-link" data-side="scholarships"><span>✦</span> Scholarships</button>
-        <button class="side-link" data-side="volunteer"><span>♡</span> Volunteer</button>
-        <button class="side-link" data-side="donate"><span>◎</span> Donate to us</button>
-      </nav>
-
-      <div class="sidebar-spacer"></div>
-
-      <div class="profile-card">
-        <div class="avatar">HK</div>
-        <div class="profile-copy">
-          <strong>Hatem Khalifa</strong>
-          <span id="roleLabel">Student</span>
-        </div>
-        <button class="icon-button" id="roleToggle" title="Toggle Student/Manager role">⇄</button>
-      </div>
-      <button class="side-link" data-side="profile"><span>◉</span> Profile</button>
-      <button class="side-link" data-side="settings"><span>⚙</span> Settings</button>
-    </aside>
-
-    <main class="main-panel">
-      <header class="topbar">
-        <button class="mobile-menu" id="mobileMenu" aria-label="Open menu">☰</button>
-        <nav class="main-nav" aria-label="Primary">
-          <button class="nav-link active" data-route="dashboard">Dashboard</button>
-          <button class="nav-link" data-route="subjects">Subjects</button>
-          <button class="nav-link" data-route="schedule">Schedule</button>
-          <button class="nav-link" data-route="rooms">Study rooms</button>
-          <button class="nav-link" data-route="community">Community</button>
+  <main class="main-panel">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu" id="mobileMenu" aria-label="Open sidebar"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="device-page-title" id="devicePageTitle">Dashboard</div>
+        <nav class="main-nav" aria-label="Main navigation">
+          <button class="nav-link active" data-route="dashboard"><span class="nav-glyph"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3Z"/></svg></span><span>Dashboard</span></button>
+          <button class="nav-link" data-route="subjects"><span class="nav-glyph"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span><span>Subjects</span></button>
+          <button class="nav-link" data-route="schedule"><span class="nav-glyph"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg></span><span>Schedule</span></button>
+          <button class="nav-link" data-route="rooms"><span class="nav-glyph"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20a5.5 5.5 0 0 1 11 0M13 20a4.5 4.5 0 0 1 8.5-2"/></svg></span><span>Rooms</span></button>
+          <button class="nav-link" data-route="community"><span class="nav-glyph"><svg viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg></span><span>Community</span></button>
         </nav>
-        <div class="topbar-actions">
-          <button class="icon-button" id="searchBtn" title="Search">⌕</button>
-          <button class="icon-button notification" title="Notifications">◌<span></span></button>
-        </div>
-      </header>
+      </div>
 
-      <section class="content" id="content"></section>
-    </main>
-  </div>
+      <div class="topbar-actions">
+        <button class="search-pill" id="searchBtn"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Find subject</span></button>
+        <button class="course-button top-course-button" id="courseButton" type="button" aria-label="Switch active course">
+          <span class="course-compact-icon"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span>
+          <span class="course-copy"><strong id="courseTitle">Sign in first</strong><small id="courseMeta">Course context</small></span>
+          <svg class="course-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <button class="icon-button updates-button" id="updatesButton" type="button" aria-label="Study updates" title="Study updates"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></button>
+        <button class="auth-button" id="authButton" type="button">Sign in</button>
+      </div>
+    </header>
 
-  <dialog id="modal">
-    <form method="dialog" class="modal-card" id="modalCard">
-      <button class="modal-close" value="cancel" aria-label="Close">×</button>
-      <div id="modalContent"></div>
-    </form>
-  </dialog>
+    <div class="subbar" aria-label="Page navigation">
+      <nav class="sub-nav" id="subNav"></nav>
+    </div>
 
-  <script src="app.js"></script>
+    <section class="content" id="content"></section>
+  </main>
+</div>
+
+<dialog id="modal"><div class="modal-card"><button class="modal-close" id="modalClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button><div id="modalContent"></div></div></dialog>
+<div class="mobile-backdrop" id="mobileBackdrop"></div>
+<script src="auth-client.js"></script>
+<script src="core-app.js"></script>
+<script src="responsive-nav.js"></script>
 </body>
 </html>
