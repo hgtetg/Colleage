@@ -6,31 +6,52 @@ The backend uses Cloudflare Pages Functions + D1. The frontend and API stay on t
 
 In Cloudflare Dashboard, create a D1 database named `colleage-db`.
 
-CLI alternative:
-
-```bash
-npx wrangler d1 create colleage-db
-```
-
-## 2. Apply the database schema
-
-From the repository root:
-
-```bash
-npx wrangler d1 execute colleage-db --remote --file=./migrations/0001_initial.sql
-```
-
-This creates users, sessions, courses, enrollments, subjects, lectures, grades, schedules, study rooms, room memberships, posts and comments. It also adds a starter public Medical Foundations course.
-
-## 3. Bind D1 to the Pages project
+## 2. Bind D1 to the Pages project
 
 In the Cloudflare Pages project settings, add a D1 binding:
 
 - Variable / binding name: `DB`
 - D1 database: `colleage-db`
-- Configure production, and preview too if you want preview deployments to use D1.
+- Configure both Preview and Production if both environments should use the backend.
 
 The Functions access the database through `env.DB`.
+
+## 3. Initialize the database without a terminal
+
+After Cloudflare deploys the latest commit, open this URL on the same Pages deployment:
+
+```text
+https://YOUR-PAGES-DOMAIN.pages.dev/api/setup
+```
+
+The setup page checks the D1 binding and all required tables. If the schema is missing, press **Initialize database** once.
+
+The setup endpoint is idempotent: it creates only missing tables/indexes and starter records and does not delete existing data. Once all required tables exist, the page reports **Database ready**.
+
+This creates:
+
+- users
+- sessions
+- courses
+- enrollments
+- subjects
+- lectures
+- grades
+- schedule items
+- study rooms
+- room memberships
+- posts
+- comments
+
+It also adds a starter public Medical Foundations course and four starter subjects.
+
+### CLI alternative
+
+The original migration remains in `migrations/0001_initial.sql`. Developers who prefer Wrangler can still run:
+
+```bash
+npx wrangler d1 execute colleage-db --remote --file=./migrations/0001_initial.sql
+```
 
 ## 4. Enable manager signup
 
@@ -41,11 +62,11 @@ Manager API permissions are server-enforced. To allow a person to create a manag
 
 Do not commit the real code to GitHub. A manager selects Manager on signup and enters this invite code. Students cannot turn themselves into managers by changing frontend state.
 
-## 5. Deploy
+Configure the secret separately for Preview and Production if you use both environments.
 
-Once the backend branch is merged into the branch deployed by Cloudflare Pages, Cloudflare will detect the root `/functions` directory and deploy the API routes with the site.
+## 5. Verify the deployed backend
 
-Check the deployed backend at:
+Check:
 
 ```text
 https://YOUR-PAGES-DOMAIN.pages.dev/api/health
@@ -57,9 +78,24 @@ Expected response:
 {"ok":true,"service":"colleage-api"}
 ```
 
-If it returns `D1 binding DB is not configured`, the code is deployed but the Pages project still needs the `DB` binding.
+Then open:
+
+```text
+https://YOUR-PAGES-DOMAIN.pages.dev/api/setup
+```
+
+It should show **Database ready** before you create an account.
+
+If `/api/health` returns `D1 binding DB is not configured`, the code is deployed but the Pages project still needs the `DB` binding.
 
 ## API overview
+
+### Setup and status
+
+- `GET /api/setup` — browser database setup/status page
+- `POST /api/setup` — idempotently create missing application tables
+- `GET /api/health`
+- `GET /api/dashboard`
 
 ### Authentication
 
@@ -114,11 +150,6 @@ A student can have up to three course enrollments and one active course. During 
 - `GET /api/posts/:id/comments`
 - `POST /api/posts/:id/comments`
 
-### Status
-
-- `GET /api/health`
-- `GET /api/dashboard`
-
 ## Security notes
 
 - Manager permissions are checked in Pages Functions, not trusted from the browser.
@@ -127,6 +158,7 @@ A student can have up to three course enrollments and one active course. During 
 - Cross-origin write requests are rejected.
 - Passwords are derived using Workers Web Crypto PBKDF2.
 - Production secrets belong in Cloudflare settings, not the repository.
+- `/api/setup` only creates missing schema/starter records; it cannot delete or reset application data.
 
 ## Next database changes
 
