@@ -12,10 +12,11 @@
     return data;
   };
 
-  window.ColleageAPI = { request: api, user: null, activeCourseId: null };
+  window.ColleageAPI = { request: api, user: null, activeCourseId: null, courses: [] };
 
   const authButton = document.getElementById('authButton');
   const roleToggle = document.getElementById('roleToggle');
+  const courseButton = document.getElementById('courseButton');
 
   function initials(name = '') {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]?.toUpperCase()).join('') || 'ST';
@@ -44,6 +45,7 @@
     } else {
       if (roleLabel) roleLabel.textContent = 'Guest';
       if (roleToggle) roleToggle.disabled = true;
+      updateCourseButton(null);
     }
   }
 
@@ -70,8 +72,10 @@
 
     const [coursesResult, subjectsResult, scheduleResult, roomsResult, postsResult] = results;
     if (coursesResult.status === 'fulfilled') {
-      const active = coursesResult.value.enrolled?.find(x => x.is_active) || coursesResult.value.enrolled?.[0];
+      window.ColleageAPI.courses = coursesResult.value.enrolled || [];
+      const active = coursesResult.value.enrolled?.find(x => x.is_active) || coursesResult.value.enrolled?.[0] || null;
       window.ColleageAPI.activeCourseId = active?.id || null;
+      updateCourseButton(active);
     }
 
     try {
@@ -106,17 +110,17 @@
       }
 
       if (roomsResult.status === 'fulfilled' && typeof rooms !== 'undefined') {
-        const mapped = roomsResult.value.rooms.map(room => ({
-          id: room.id,
+        const mapped = roomsResult.value.rooms.map((room, index) => ({
+          id: index + 1,
+          apiId: room.id,
           name: room.name,
           topic: room.topic || 'General study',
           members: room.member_count ? [`+${room.member_count}`] : [],
-          live: !!room.is_live
+          live: !!room.is_live,
+          joined: !!room.joined
         }));
         rooms.splice(0, rooms.length, ...mapped);
-        if (typeof state !== 'undefined') {
-          state.joinedRooms = new Set(roomsResult.value.rooms.filter(r => r.joined).map(r => r.id));
-        }
+        if (typeof state !== 'undefined') state.joinedRooms = new Set(mapped.filter(r => r.joined).map(r => r.id));
       }
 
       if (postsResult.status === 'fulfilled' && typeof posts !== 'undefined') {
@@ -133,6 +137,14 @@
     } catch (error) {
       console.warn('Could not hydrate the current UI:', error);
     }
+  }
+
+  function updateCourseButton(course) {
+    if (!courseButton) return;
+    const title = courseButton.querySelector('strong');
+    const subtitle = courseButton.querySelector('small');
+    if (title) title.textContent = course?.name || 'Choose a course';
+    if (subtitle) subtitle.textContent = course ? [course.field, course.stage].filter(Boolean).join(' · ') || (course.is_public ? 'Public course' : 'Course') : 'Up to 3 enrollments';
   }
 
   function openAuth(mode = 'login') {
@@ -221,6 +233,7 @@
       document.getElementById('authOverlay')?.classList.remove('show');
       await hydrateApp();
       showToast('Account created');
+      if (!window.ColleageAPI.activeCourseId) openCoursePicker();
     } catch (err) { error.textContent = err.message; }
   }
 
@@ -228,6 +241,40 @@
     try { await api('/api/auth/logout', { method: 'POST', body: '{}' }); } catch {}
     setUser(null);
     location.reload();
+  }
+
+  async function openCoursePicker() {
+    if (!window.ColleageAPI.user) return openAuth('login');
+    try {
+      const data = await api('/api/courses');
+      let overlay = document.getElementById('courseOverlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'courseOverlay';
+        overlay.className = 'auth-overlay';
+        document.body.appendChild(overlay);
+      }
+      const enrolled = data.enrolled || [];
+      const discover = data.discover || [];
+      overlay.innerHTML = `<div class="auth-panel course-picker" role="dialog" aria-modal="true"><button class="auth-close" type="button">×</button><div class="eyebrow">Course context</div><h2>Choose your active course</h2><p>Your active course filters subjects, schedule, rooms and community content.</p><div class="course-picker-list"><h3>Your courses</h3>${enrolled.length ? enrolled.map(c => `<div class="course-picker-row"><div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml([c.field,c.stage,c.institution_name].filter(Boolean).join(' · ') || 'Course')}</span></div><button class="btn ${c.is_active ? 'btn-ghost' : 'btn-primary'}" data-course-action="activate" data-course-id="${escapeHtml(c.id)}" ${c.is_active ? 'disabled' : ''}>${c.is_active ? 'Active' : 'Activate'}</button></div>`).join('') : '<div class="empty">No enrolled courses yet.</div>'}<h3>Discover public courses</h3>${discover.length ? discover.map(c => `<div class="course-picker-row"><div><strong>${escapeHtml(c.name)}</strong><span>${escapeHtml([c.field,c.stage].filter(Boolean).join(' · ') || 'Public course')}</span></div><button class="btn btn-ghost" data-course-action="enroll" data-course-id="${escapeHtml(c.id)}">Enroll</button></div>`).join('') : '<div class="empty">No additional public courses available.</div>'}</div></div>`;
+      overlay.classList.add('show');
+      overlay.querySelector('.auth-close').onclick = () => overlay.classList.remove('show');
+      overlay.onclick = event => { if (event.target === overlay) overlay.classList.remove('show'); };
+      overlay.querySelectorAll('[data-course-action]').forEach(button => button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const id = button.dataset.courseId;
+          const action = button.dataset.courseAction;
+          await api(`/api/courses/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: '{}' });
+          overlay.classList.remove('show');
+          await hydrateApp();
+          showToast(action === 'enroll' ? 'Course enrolled' : 'Active course changed');
+        } catch (error) {
+          button.disabled = false;
+          showToast(error.message);
+        }
+      });
+    } catch (error) { showToast(error.message); }
   }
 
   async function syncInteraction(event) {
@@ -245,9 +292,12 @@
       }
 
       if (button.classList.contains('room-btn')) {
-        const id = button.dataset.room;
-        const joined = typeof state !== 'undefined' && state.joinedRooms.has(id);
-        await api(`/api/rooms/${encodeURIComponent(id)}/join`, { method: joined ? 'POST' : 'DELETE', body: '{}' });
+        const localId = Number(button.dataset.room);
+        const room = typeof rooms !== 'undefined' ? rooms.find(r => r.id === localId) : null;
+        if (room?.apiId) {
+          const joined = typeof state !== 'undefined' && state.joinedRooms.has(localId);
+          await api(`/api/rooms/${encodeURIComponent(room.apiId)}/join`, { method: joined ? 'POST' : 'DELETE', body: '{}' });
+        }
       }
 
       if (button.id === 'publishPost') {
@@ -257,6 +307,35 @@
           await hydrateApp();
         }
       }
+
+      if (button.id === 'saveSimple') {
+        const modalContent = document.getElementById('modalContent');
+        const heading = modalContent?.querySelector('h2')?.textContent.trim();
+        const inputs = [...(modalContent?.querySelectorAll('input') || [])];
+        const select = modalContent?.querySelector('select');
+
+        if (heading === 'Add subject') {
+          const name = inputs[0]?.value.trim();
+          const code = inputs[1]?.value.trim();
+          if (name) await api('/api/subjects', { method: 'POST', body: JSON.stringify({ name, code, courseId: window.ColleageAPI.activeCourseId }) });
+        }
+        if (heading === 'New study block') {
+          const title = inputs[0]?.value.trim();
+          const time = inputs.find(x => x.type === 'time')?.value;
+          if (title && time) {
+            const start = new Date();
+            const [hour, minute] = time.split(':').map(Number);
+            start.setHours(hour, minute, 0, 0);
+            await api('/api/schedule', { method: 'POST', body: JSON.stringify({ title, startAt: start.toISOString(), type: select?.value || 'Study', courseId: window.ColleageAPI.activeCourseId }) });
+          }
+        }
+        if (heading === 'Create a room') {
+          const name = inputs[0]?.value.trim();
+          const topic = inputs[1]?.value.trim();
+          if (name) await api('/api/rooms', { method: 'POST', body: JSON.stringify({ name, topic, courseId: window.ColleageAPI.activeCourseId }) });
+        }
+        await hydrateApp();
+      }
     } catch (error) {
       console.warn('Background sync failed:', error.message);
       showToast(error.message);
@@ -264,6 +343,7 @@
   }
 
   if (authButton) authButton.onclick = () => window.ColleageAPI.user ? showAccountMenu() : openAuth('login');
+  if (courseButton) courseButton.onclick = () => openCoursePicker();
   document.addEventListener('click', syncInteraction);
 
   function showAccountMenu() {
