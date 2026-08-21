@@ -1,166 +1,32 @@
-const subjects = [
-  { id:'anatomy', name:'Human Anatomy', icon:'AN', progress:72, lectures:18, grade:91, color:'green' },
-  { id:'chemistry', name:'Organic Chemistry', icon:'CH', progress:58, lectures:16, grade:84, color:'amber' },
-  { id:'physics', name:'Medical Physics', icon:'PH', progress:43, lectures:14, grade:79, color:'blue' },
-  { id:'biology', name:'Cell Biology', icon:'BI', progress:81, lectures:20, grade:93, color:'violet' }
-];
-
-const schedule = [
-  { time:'09:00', title:'Anatomy — Thorax review', type:'Lecture', room:'Hall B' },
-  { time:'11:30', title:'Organic Chemistry practice', type:'Study', room:'Library 2' },
-  { time:'14:00', title:'Cell Biology quiz prep', type:'Quiz', room:'Online' }
-];
-
-const rooms = [
-  { id:1, name:'Anatomy Sprint', topic:'Thorax + Abdomen', members:['SA','MK','LN'], live:true },
-  { id:2, name:'Chemistry Problem Lab', topic:'Reaction mechanisms', members:['YA','OM'], live:true },
-  { id:3, name:'Quiet Focus 50/10', topic:'Pomodoro study room', members:['AR','NO','AM','+4'], live:false }
-];
-
-let posts = [
-  { name:'Sara Ahmed', initials:'SA', text:'Does anyone have a good way to remember the branches of the aortic arch?', meta:'12 min ago · Anatomy' },
-  { name:'Omar Kareem', initials:'OK', text:'Uploaded my reaction-mechanism summary. It helped me organize SN1/SN2 and E1/E2 in one page.', meta:'38 min ago · Chemistry' }
-];
-
-let state = { route:'dashboard', subjectTab:'subjects', joinedRooms:new Set(), manager:false };
-const content = document.getElementById('content');
-const modal = document.getElementById('modal');
-const modalContent = document.getElementById('modalContent');
-
-function toast(message) {
-  const el = document.createElement('div'); el.className='toast'; el.textContent=message;
-  document.body.appendChild(el); setTimeout(()=>el.remove(),2200);
-}
-
-function setRoute(route) {
-  state.route = route;
-  document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.route===route));
-  render();
-}
-
-function sectionHead(eyebrow,title,action='') {
-  return `<div class="section-head"><div><div class="eyebrow">${eyebrow}</div><h2>${title}</h2></div>${action}</div>`;
-}
-
-function subjectCards() {
-  return `<div class="grid grid-4">${subjects.map(s=>`
-    <article class="card subject-card" data-subject="${s.id}">
-      <div class="subject-icon">${s.icon}</div><h3>${s.name}</h3>
-      <div class="muted" style="font-size:11px">${s.lectures} lectures · ${s.grade}% current grade</div>
-      <div class="meter"><span style="width:${s.progress}%"></span></div>
-      <div class="subject-meta"><span>${s.progress}% complete</span><span>Open →</span></div>
-    </article>`).join('')}</div>`;
-}
-
-function dashboard() {
-  return `
-    <div class="manager-banner">Manager mode is active. You can add, edit and remove learning content.</div>
-    <div class="hero">
-      <section class="hero-card">
-        <div class="eyebrow" style="color:#9ed8c2">Friday · Study dashboard</div>
-        <h1>Build momentum, one focused session at a time.</h1>
-        <p>Your next study block is ready. Continue where you stopped, join classmates, or review today’s schedule.</p>
-        <div class="hero-actions"><button class="btn btn-light" data-go="subjects">Continue studying</button><button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,.18)" data-go="schedule">View schedule</button></div>
-      </section>
-      <aside class="focus-card">
-        <div class="eyebrow">Today’s focus</div><div class="focus-time">2h 45m</div>
-        <p class="muted">3 focused sessions completed. Your weekly target is 15 hours.</p>
-        <div class="progress-ring"><span></span></div><small class="muted" style="margin-top:10px">68% of daily study target</small>
-      </aside>
-    </div>
-    ${sectionHead('Your course','Continue your subjects','<button class="btn btn-ghost manager-only" id="addSubject">+ Add subject</button>')}
-    ${subjectCards()}
-    ${sectionHead('Today','Upcoming schedule','<button class="btn btn-ghost" data-go="schedule">See full schedule</button>')}
-    <div class="schedule-list">${schedule.slice(0,2).map(item=>scheduleRow(item)).join('')}</div>
-    ${sectionHead('Progress','This week')}
-    <div class="grid grid-4">
-      <div class="card stat"><span class="muted">Study time</span><b>11.4h</b><span class="tag">+18%</span></div>
-      <div class="card stat"><span class="muted">Lessons finished</span><b>14</b><span class="tag">4 this week</span></div>
-      <div class="card stat"><span class="muted">Average grade</span><b>86.8%</b><span class="tag">Strong</span></div>
-      <div class="card stat"><span class="muted">Study streak</span><b>8 days</b><span class="tag">Best: 12</span></div>
-    </div>`;
-}
-
-function scheduleRow(item) {
-  return `<div class="schedule-item"><div class="time-badge">${item.time}</div><div><strong>${item.title}</strong><div class="muted" style="font-size:11px;margin-top:4px">${item.room} · <span class="tag">${item.type}</span></div></div><button class="btn btn-ghost schedule-done">Mark done</button></div>`;
-}
-
-function subjectsPage() {
-  return `<h1 class="page-title">Subjects</h1><p class="muted">Study resources, grades and learning analytics for your active course.</p>
-  <div class="subnav"><button class="${state.subjectTab==='subjects'?'active':''}" data-tab="subjects">Subjects</button><button class="${state.subjectTab==='grades'?'active':''}" data-tab="grades">Degrees</button><button class="${state.subjectTab==='analytics'?'active':''}" data-tab="analytics">Analytics</button></div>
-  <div class="manager-banner">Manager mode: create subjects and maintain lectures, grades and resources.</div>
-  ${state.subjectTab==='subjects' ? `<div class="toolbar"><input class="search" id="subjectSearch" placeholder="Search your subjects"><button class="btn btn-primary manager-only" id="addSubject">+ New subject</button></div><div id="subjectGrid">${subjectCards()}</div>` : ''}
-  ${state.subjectTab==='grades' ? `<div class="grid grid-2">${subjects.map(s=>`<div class="card"><div class="subject-meta"><strong>${s.name}</strong><span class="tag">${s.grade}%</span></div><div class="meter"><span style="width:${s.grade}%"></span></div><p class="muted">Current weighted course degree based on completed assessments.</p></div>`).join('')}</div>`:''}
-  ${state.subjectTab==='analytics' ? `<div class="grid grid-3"><div class="card stat"><span class="muted">Best subject</span><b>Cell Biology</b><span class="tag">93%</span></div><div class="card stat"><span class="muted">Needs attention</span><b>Physics</b><span class="tag">79%</span></div><div class="card stat"><span class="muted">Completion</span><b>64%</b><span class="tag">Across course</span></div></div>`:''}`;
-}
-
-function subjectDetail(id) {
-  const s=subjects.find(x=>x.id===id); if(!s) return;
-  content.innerHTML = `<button class="btn btn-ghost" id="backSubjects">← Back</button><div style="height:20px"></div><div class="eyebrow">Subject workspace</div><h1 class="page-title">${s.name}</h1><p class="muted">All lectures, results and progress for this subject.</p>
-    <div class="grid grid-3" style="margin:24px 0"><div class="card stat"><span class="muted">Completion</span><b>${s.progress}%</b></div><div class="card stat"><span class="muted">Current degree</span><b>${s.grade}%</b></div><div class="card stat"><span class="muted">Lectures</span><b>${s.lectures}</b></div></div>
-    ${sectionHead('Learning','Lectures','<button class="btn btn-primary manager-only" id="addLecture">+ Add lecture</button>')}
-    <div class="schedule-list">${['Core concepts and introduction','Clinical applications','Revision and self-test'].map((x,i)=>`<div class="schedule-item"><div class="time-badge">0${i+1}</div><div><strong>${x}</strong><div class="muted" style="font-size:11px">Notes · Flashcards · Mind map</div></div><button class="btn btn-ghost lecture-open">Open</button></div>`).join('')}</div>`;
-  bindCommon();
-  document.getElementById('backSubjects').onclick=()=>setRoute('subjects');
-  document.querySelectorAll('.lecture-open').forEach(b=>b.onclick=()=>toast('Lecture workspace opened'));
-}
-
-function schedulePage() {
-  return `<h1 class="page-title">Schedule</h1><p class="muted">Plan classes and study sessions around your active course.</p>
-  <div class="toolbar"><button class="btn btn-primary" id="addSchedule">+ Add study block</button><button class="btn btn-ghost" id="clearDone">Reset completed</button></div>
-  <div class="schedule-list">${schedule.map(scheduleRow).join('')}</div>`;
-}
-
-function roomsPage() {
-  return `<h1 class="page-title">Study rooms</h1><p class="muted">Focus together in live rooms organized around subjects and goals.</p>
-  <div class="toolbar"><button class="btn btn-primary" id="createRoom">+ Create room</button></div>
-  <div class="grid grid-3">${rooms.map(r=>`<article class="card room-card"><div class="room-top"><div><span class="tag">${r.live?'Live now':'Open room'}</span><h3 style="margin-top:12px">${r.name}</h3><p class="muted">${r.topic}</p></div></div><div class="room-members">${r.members.map(x=>`<span class="mini-avatar">${x}</span>`).join('')}</div><button class="btn ${state.joinedRooms.has(r.id)?'btn-ghost':'btn-primary'} room-btn" data-room="${r.id}" style="margin-top:18px">${state.joinedRooms.has(r.id)?'Leave room':'Join room'}</button></article>`).join('')}</div>`;
-}
-
-function communityPage() {
-  return `<h1 class="page-title">Community</h1><p class="muted">Ask questions, share resources and learn with people in your course.</p>
-  <div class="toolbar"><button class="btn btn-primary" id="newPost">+ New post</button></div>
-  <div class="feed">${posts.map(p=>`<article class="card post"><div class="avatar">${p.initials}</div><div><strong>${p.name}</strong><div class="muted" style="font-size:10px;margin-top:3px">${p.meta}</div><p>${p.text}</p><div class="post-actions"><span>♡ Helpful</span><span>↩ Reply</span><span>⋯ More</span></div></div></article>`).join('')}</div>`;
-}
-
-function infoPage(name) {
-  const map={jobs:['Find a work','Career opportunities for students will appear here.'],scholarships:['Scholarships','Discover scholarships matched to your stage and field.'],volunteer:['Volunteer','Find meaningful volunteering opportunities and build experience.'],donate:['Donate to us','Support the student community and help us keep resources accessible.'],profile:['Profile','Manage your study identity, active course and learning record.'],settings:['Settings','Control notifications, accessibility, appearance and privacy.']};
-  const [title,desc]=map[name]||['Colleage','Student workspace'];
-  return `<h1 class="page-title">${title}</h1><p class="muted">${desc}</p><div class="card" style="margin-top:24px"><h3>Workspace ready</h3><p class="muted">This route is wired into the application and ready for backend data integration.</p></div>`;
-}
-
-function render() {
-  if(state.route==='dashboard') content.innerHTML=dashboard();
-  else if(state.route==='subjects') content.innerHTML=subjectsPage();
-  else if(state.route==='schedule') content.innerHTML=schedulePage();
-  else if(state.route==='rooms') content.innerHTML=roomsPage();
-  else if(state.route==='community') content.innerHTML=communityPage();
-  else content.innerHTML=infoPage(state.route);
-  bindCommon();
-}
-
-function openModal(html) { modalContent.innerHTML=html; modal.showModal(); }
-function bindCommon() {
-  document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>setRoute(b.dataset.go));
-  document.querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>subjectDetail(b.dataset.subject));
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.subjectTab=b.dataset.tab;render();});
-  document.querySelectorAll('.schedule-done').forEach(b=>b.onclick=()=>{b.textContent='Completed ✓';b.disabled=true;toast('Study block completed');});
-  document.querySelectorAll('.room-btn').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.room); state.joinedRooms.has(id)?state.joinedRooms.delete(id):state.joinedRooms.add(id);render();toast(state.joinedRooms.has(id)?'Joined study room':'Left study room');});
-  const search=document.getElementById('subjectSearch'); if(search) search.oninput=e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('.subject-card').forEach(c=>c.style.display=c.innerText.toLowerCase().includes(q)?'flex':'none');};
-  const addSubject=document.getElementById('addSubject'); if(addSubject) addSubject.onclick=()=>openModal(`<div class="eyebrow">Manager tool</div><h2>Add subject</h2><div class="form-grid"><input placeholder="Subject name"><input placeholder="Subject code"><button class="btn btn-primary" id="saveSubject" type="button">Create subject</button></div>`);
-  const addSchedule=document.getElementById('addSchedule'); if(addSchedule) addSchedule.onclick=()=>openModal(`<div class="eyebrow">Schedule</div><h2>New study block</h2><div class="form-grid"><input placeholder="Title"><input type="time"><select><option>Study</option><option>Lecture</option><option>Quiz</option></select><button class="btn btn-primary" type="button" id="saveSchedule">Add to schedule</button></div>`);
-  const createRoom=document.getElementById('createRoom'); if(createRoom) createRoom.onclick=()=>openModal(`<div class="eyebrow">Study rooms</div><h2>Create a room</h2><div class="form-grid"><input placeholder="Room name"><input placeholder="Topic"><button class="btn btn-primary" type="button" id="saveRoom">Create room</button></div>`);
-  const newPost=document.getElementById('newPost'); if(newPost) newPost.onclick=()=>openModal(`<div class="eyebrow">Community</div><h2>Share with your course</h2><div class="form-grid"><textarea id="postText" placeholder="Ask a question or share a useful resource..."></textarea><button class="btn btn-primary" type="button" id="publishPost">Publish post</button></div>`);
-  setTimeout(()=>{
-    ['saveSubject','saveSchedule','saveRoom'].forEach(id=>{const el=document.getElementById(id);if(el)el.onclick=()=>{modal.close();toast('Saved successfully');};});
-    const publish=document.getElementById('publishPost'); if(publish) publish.onclick=()=>{const t=document.getElementById('postText').value.trim();if(t){posts.unshift({name:'Hatem Khalifa',initials:'HK',text:t,meta:'Just now · General'});modal.close();render();toast('Post published');}};
-  },0);
-}
-
-document.querySelectorAll('.nav-link').forEach(b=>b.onclick=()=>setRoute(b.dataset.route));
-document.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav-link').forEach(x=>x.classList.remove('active'));state.route=b.dataset.side;render();document.getElementById('sidebar').classList.remove('open');});
-document.getElementById('mobileMenu').onclick=()=>document.getElementById('sidebar').classList.toggle('open');
-document.getElementById('roleToggle').onclick=()=>{state.manager=!state.manager;document.body.classList.toggle('manager',state.manager);document.getElementById('roleLabel').textContent=state.manager?'Manager':'Student';toast(`${state.manager?'Manager':'Student'} mode active`);render();};
-document.getElementById('searchBtn').onclick=()=>{setRoute('subjects');setTimeout(()=>document.getElementById('subjectSearch')?.focus(),50);};
-modal.addEventListener('click',e=>{if(e.target===modal)modal.close();});
-render();
+const icons={book:'<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4H6.5A2.5 2.5 0 0 0 4 6.5v13Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>',flask:'<svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5.5 9.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></svg>',atom:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><path d="M19.4 15c2-3.5 2.2-6.8.5-7.8-1.8-1-4.8.7-6.8 4.2S10.9 18.2 12.6 19c1.8 1 4.8-.6 6.8-4Z"/><path d="M4.6 15c-2-3.5-2.2-6.8-.5-7.8 1.8-1 4.8.7 6.8 4.2s2.2 6.8.5 7.6c-1.8 1-4.8-.6-6.8-4Z"/><path d="M12 4c4 0 7 1.5 7 3.5S16 11 12 11 5 9.5 5 7.5 8 4 12 4Z"/></svg>',dna:'<svg viewBox="0 0 24 24"><path d="M5 4c6 4 8 12 14 16M19 4C13 8 11 16 5 20M8 7h8M6 12h12M8 17h8"/></svg>',clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',check:'<svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>',chart:'<svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"/></svg>',file:'<svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 13h6M9 17h6"/></svg>',users:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M17 14a7 7 0 0 1 5 7"/></svg>',briefcase:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18"/></svg>',award:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="m8.5 12-1 9 4.5-2 4.5 2-1-9"/></svg>',heart:'<svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>',bell:'<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>'};
+const subjects=[{id:'anatomy',name:'Human Anatomy',code:'MED-204',icon:'book',progress:72,lectures:18,grade:91,tone:'#ecfdf3',ink:'#047857'},{id:'chemistry',name:'Organic Chemistry',code:'CHEM-211',icon:'flask',progress:58,lectures:16,grade:84,tone:'#fff7ed',ink:'#c2410c'},{id:'physics',name:'Medical Physics',code:'PHY-205',icon:'atom',progress:43,lectures:14,grade:79,tone:'#eff6ff',ink:'#1d4ed8'},{id:'biology',name:'Cell Biology',code:'BIO-202',icon:'dna',progress:81,lectures:20,grade:93,tone:'#f5f3ff',ink:'#6d28d9'}];
+const schedule=[{time:'09:00',title:'Anatomy — Thorax review',type:'Lecture',room:'Hall B'},{time:'11:30',title:'Organic Chemistry practice',type:'Study',room:'Library 2'},{time:'14:00',title:'Cell Biology quiz prep',type:'Quiz',room:'Online'},{time:'17:30',title:'Physics problem set',type:'Focus',room:'Home'}];
+const rooms=[{id:1,name:'Anatomy Sprint',topic:'Thorax + Abdomen',members:['SA','MK','LN'],live:true},{id:2,name:'Chemistry Problem Lab',topic:'Reaction mechanisms',members:['YA','OM'],live:true},{id:3,name:'Quiet Focus 50/10',topic:'Pomodoro study room',members:['AR','NO','AM','+4'],live:false}];
+let posts=[{name:'Sara Ahmed',initials:'SA',text:'Does anyone have a good way to remember the branches of the aortic arch?',meta:'12 min ago · Anatomy'},{name:'Omar Kareem',initials:'OK',text:'Uploaded my reaction-mechanism summary. It helped me organize SN1/SN2 and E1/E2 in one page.',meta:'38 min ago · Chemistry'},{name:'Lina Nabil',initials:'LN',text:'Study room for tomorrow’s biology quiz is open at 7 PM. Everyone is welcome.',meta:'1 hr ago · Cell Biology'}];
+const jobs=[['Clinical Data Assistant','Al-Rafidain Health Lab','Part-time · Baghdad','Apply by Sep 04'],['Student Content Reviewer','MedLearn','Remote · Flexible','New'],['Research Assistant','University Lab','12 hrs/week','Applications open']];
+const scholarships=[['Future Physicians Grant','Academic merit','Up to $2,500','Deadline Sep 18'],['STEM Student Support Fund','Need + achievement','Tuition support','Deadline Oct 01'],['Global Health Fellowship','Research track','Funded program','2027 intake']];
+let state={route:'dashboard',subjectTab:'subjects',joinedRooms:new Set(),manager:false};
+const content=document.getElementById('content'),modal=document.getElementById('modal'),modalContent=document.getElementById('modalContent');
+const icon=n=>icons[n]||icons.file;
+function toast(message){const el=document.createElement('div');el.className='toast';el.textContent=message;document.body.appendChild(el);setTimeout(()=>el.remove(),2200)}
+function setRoute(route){state.route=route;document.querySelectorAll('.nav-link').forEach(b=>b.classList.toggle('active',b.dataset.route===route));document.querySelectorAll('.side-link').forEach(b=>b.classList.toggle('active',b.dataset.side===route));render();closeMobile()}
+function closeMobile(){document.getElementById('sidebar').classList.remove('open');document.getElementById('mobileBackdrop').classList.remove('show')}
+function sectionHead(kicker,title,action=''){return `<div class="section-head"><div><div class="eyebrow">${kicker}</div><h2>${title}</h2></div>${action}</div>`}
+function pageIntro(kicker,title,copy,action=''){return `<div class="page-intro"><div><div class="eyebrow">${kicker}</div><h1 class="page-title">${title}</h1><p class="page-copy">${copy}</p></div>${action}</div>`}
+function subjectCards(){return `<div class="grid grid-4">${subjects.map(s=>`<article class="card subject-card" data-subject="${s.id}" style="--tone:${s.tone};--tone-ink:${s.ink}"><div class="subject-icon">${icon(s.icon)}</div><div class="subject-code">${s.code}</div><h3>${s.name}</h3><div class="muted" style="font-size:10px">${s.lectures} lectures · ${s.grade}% current grade</div><div class="meter"><span style="width:${s.progress}%"></span></div><div class="subject-meta"><span>${s.progress}% complete</span><span>Open →</span></div></article>`).join('')}</div>`}
+function scheduleRow(item){return `<div class="schedule-item"><div class="time-badge">${item.time}</div><div><strong style="font-size:11px">${item.title}</strong><div class="muted" style="font-size:9px;margin-top:4px">${item.room} · <span class="tag">${item.type}</span></div></div><button class="btn btn-ghost schedule-done">${icon('check')} Mark done</button></div>`}
+function dashboard(){return `<div class="manager-banner">Manager mode is active — content management controls are visible.</div><div class="hero"><section class="hero-card"><div class="eyebrow" style="color:#bfdbfe">Friday · Study dashboard</div><h1>Make today count.</h1><p>Your course, study materials, schedule and classmates are all in one place. Pick up the next high-impact task and keep your momentum moving.</p><div class="hero-actions"><button class="btn btn-light" data-go="subjects">${icon('book')} Continue studying</button><button class="btn btn-ghost" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:white" data-go="schedule">${icon('clock')} View schedule</button></div><div class="hero-meta"><span class="hero-chip">8 day streak</span><span class="hero-chip">64% course complete</span></div></section><aside class="focus-card"><div class="eyebrow">Today’s focus</div><div class="focus-time">2h 45m</div><p class="muted" style="font-size:11px;line-height:1.6">3 focused sessions completed. You are on pace for your 15-hour weekly target.</p><div class="focus-row"><span>Daily target</span><strong>68%</strong></div><div class="progress-ring"><span style="width:68%"></span></div><button class="btn btn-primary" data-go="schedule">Plan next session</button></aside></div>${sectionHead('Active course','Continue where you stopped','<button class="btn btn-ghost manager-only" id="addSubject">+ Add subject</button>')}${subjectCards()}${sectionHead('Today','Upcoming schedule','<button class="btn btn-ghost" data-go="schedule">Full schedule</button>')}<div class="schedule-list">${schedule.slice(0,3).map(scheduleRow).join('')}</div>${sectionHead('Progress','Your learning pulse')}<div class="grid grid-4"><div class="card stat"><div class="stat-icon">${icon('clock')}</div><span class="muted">Study time</span><b>11.4h</b><span class="trend">↑ 18% vs last week</span></div><div class="card stat"><div class="stat-icon">${icon('check')}</div><span class="muted">Lessons finished</span><b>14</b><span class="trend">4 this week</span></div><div class="card stat"><div class="stat-icon">${icon('chart')}</div><span class="muted">Average grade</span><b>86.8%</b><span class="trend">Strong performance</span></div><div class="card stat"><div class="stat-icon">${icon('award')}</div><span class="muted">Study streak</span><b>8 days</b><span class="trend">Best: 12 days</span></div></div>${sectionHead('Activity','Study consistency')}<div class="activity-grid"><div class="card"><h3>Last 14 weeks</h3><p class="muted" style="font-size:10px">A quick view of how consistently you have been studying.</p><div class="heatmap">${Array.from({length:98},()=>'<span></span>').join('')}</div></div><div class="card"><h3>Next milestone</h3><p class="muted" style="font-size:10px;line-height:1.6">Complete 3 more Anatomy lectures to reach the 80% subject milestone.</p><div class="meter" style="margin:18px 0"><span style="width:72%"></span></div><button class="btn btn-ghost" data-subject="anatomy">Open Anatomy</button></div></div>`}
+function subjectsPage(){return `${pageIntro('Learning hub','Subjects','Study resources, grades and analytics for your active course.')}<div class="subnav"><button class="${state.subjectTab==='subjects'?'active':''}" data-tab="subjects">Subjects</button><button class="${state.subjectTab==='grades'?'active':''}" data-tab="grades">Degrees</button><button class="${state.subjectTab==='analytics'?'active':''}" data-tab="analytics">Analytics</button></div><div class="manager-banner">Manager mode: create subjects and maintain lectures, grades and resources.</div>${state.subjectTab==='subjects'?`<div class="toolbar"><input class="search" id="subjectSearch" placeholder="Search subjects, codes or resources"><button class="btn btn-primary manager-only" id="addSubject">+ New subject</button></div><div id="subjectGrid">${subjectCards()}</div>${sectionHead('Recently used','Study resources')}<div class="grid grid-3">${[['Lecture notes','Thorax anatomy · PDF','file'],['Flashcard deck','Organic chemistry · 84 cards','book'],['Mind map','Cell cycle overview','chart']].map(r=>`<div class="resource-row"><div class="resource-icon">${icon(r[2])}</div><div class="resource-copy"><strong>${r[0]}</strong><span>${r[1]}</span></div><button class="btn btn-ghost">Open</button></div>`).join('')}</div>`:''}${state.subjectTab==='grades'?`<div class="grid grid-2">${subjects.map(s=>`<div class="card"><div class="subject-meta"><strong>${s.name}</strong><span class="tag green">${s.grade}%</span></div><div class="meter"><span style="width:${s.grade}%"></span></div><p class="muted" style="font-size:10px">Weighted degree across completed assessments.</p></div>`).join('')}</div>`:''}${state.subjectTab==='analytics'?`<div class="grid grid-3"><div class="card stat"><div class="stat-icon">${icon('award')}</div><span class="muted">Best subject</span><b>Cell Biology</b><span class="trend">93%</span></div><div class="card stat"><div class="stat-icon">${icon('chart')}</div><span class="muted">Needs attention</span><b>Physics</b><span class="trend" style="color:#b54708">79%</span></div><div class="card stat"><div class="stat-icon">${icon('check')}</div><span class="muted">Completion</span><b>64%</b><span class="trend">Across course</span></div></div>`:''}`}
+function subjectDetail(id){const s=subjects.find(x=>x.id===id);if(!s)return;content.innerHTML=`<button class="btn btn-ghost" id="backSubjects">← Back to subjects</button><div style="height:18px"></div>${pageIntro(s.code,s.name,'Lectures, notes, flashcards, mind maps, grades and learning progress for this subject.','<button class="btn btn-primary manager-only" id="addLecture">+ Add lecture</button>')}<div class="grid grid-3"><div class="card stat"><span class="muted">Completion</span><b>${s.progress}%</b></div><div class="card stat"><span class="muted">Current degree</span><b>${s.grade}%</b></div><div class="card stat"><span class="muted">Lectures</span><b>${s.lectures}</b></div></div>${sectionHead('Learning path','Lectures & resources')}<div class="schedule-list">${['Core concepts and introduction','Applied concepts and clinical links','Revision, flashcards and self-test','Exam-focused high-yield review'].map((x,i)=>`<div class="schedule-item"><div class="time-badge">0${i+1}</div><div><strong style="font-size:11px">${x}</strong><div class="muted" style="font-size:9px;margin-top:4px">Notes · Flashcards · Mind map · Quiz</div></div><button class="btn btn-ghost lecture-open">Open</button></div>`).join('')}</div>`;bindCommon();document.getElementById('backSubjects').onclick=()=>setRoute('subjects');document.querySelectorAll('.lecture-open').forEach(b=>b.onclick=()=>toast('Lecture workspace opened'))}
+function schedulePage(){return `${pageIntro('Planner','Schedule','Build a realistic weekly plan around lectures, study sessions and exams.','<button class="btn btn-primary" id="addSchedule">+ Add study block</button>')}<div class="grid grid-3" style="margin-bottom:18px"><div class="card stat"><span class="muted">Today</span><b>4 blocks</b><span class="trend">2h 45m planned</span></div><div class="card stat"><span class="muted">This week</span><b>15.0h</b><span class="trend">Target set</span></div><div class="card stat"><span class="muted">Next exam</span><b>6 days</b><span class="trend">Organic Chemistry</span></div></div><div class="schedule-list">${schedule.map(scheduleRow).join('')}</div>`}
+function roomsPage(){return `${pageIntro('Focus together','Study rooms','Join classmates for live focus sessions, topic reviews and quiet Pomodoro rooms.','<button class="btn btn-primary" id="createRoom">+ Create room</button>')}<div class="grid grid-3">${rooms.map(r=>`<article class="card room-card"><span class="tag ${r.live?'green':''}">${r.live?'Live now':'Open room'}</span><h3 style="margin-top:14px">${r.name}</h3><p class="muted" style="font-size:10px;line-height:1.55">${r.topic}</p><div class="room-members">${r.members.map(x=>`<span class="mini-avatar">${x}</span>`).join('')}</div><button class="btn ${state.joinedRooms.has(r.id)?'btn-ghost':'btn-primary'} room-btn" data-room="${r.id}" style="margin-top:18px">${state.joinedRooms.has(r.id)?'Leave room':'Join room'}</button></article>`).join('')}</div>`}
+function communityPage(){return `${pageIntro('Course network','Community','Ask questions, share useful resources and learn with people in your course.','<button class="btn btn-primary" id="newPost">+ New post</button>')}<div class="feed">${posts.map(p=>`<article class="card post"><div class="avatar">${p.initials}</div><div><strong style="font-size:11px">${p.name}</strong><div class="muted" style="font-size:9px;margin-top:3px">${p.meta}</div><p>${p.text}</p><div class="post-actions"><span>♡ Helpful</span><span>↩ Reply</span><span>⋯ More</span></div></div></article>`).join('')}</div>`}
+function opportunityPage(kind){const isJob=kind==='jobs',data=isJob?jobs:scholarships;return `${pageIntro(isJob?'Career center':'Funding hub',isJob?'Find work':'Scholarships',isJob?'Explore student-friendly jobs, internships and research roles that fit around your academic schedule.':'Discover funding opportunities matched to your stage, field and study goals.','<button class="btn btn-ghost">Saved opportunities</button>')}<div class="toolbar"><input class="search" placeholder="Search opportunities"><button class="btn btn-ghost">Filters</button></div><div class="opportunity-list">${data.map(x=>`<div class="opportunity-card"><div class="resource-icon">${icon(isJob?'briefcase':'award')}</div><div class="resource-copy"><strong>${x[0]}</strong><span>${x[1]}</span><div class="opportunity-meta"><span class="tag">${x[2]}</span><span class="tag green">${x[3]}</span></div></div><button class="btn btn-primary">View</button></div>`).join('')}</div>`}
+function volunteerPage(){return `${pageIntro('Give your time','Volunteer','Build experience, support communities and add meaningful activity to your student profile.')}<div class="grid grid-3">${[['Campus Health Day','Health outreach','Saturday · 4 hours'],['Peer Study Mentor','Education','2 hours/week'],['Blood Donation Campaign','Community','One-day event']].map(x=>`<div class="card"><div class="resource-icon">${icon('heart')}</div><h3 style="margin-top:14px">${x[0]}</h3><p class="muted" style="font-size:10px">${x[1]}</p><span class="tag green">${x[2]}</span><button class="btn btn-ghost" style="margin-top:16px;width:100%">View opportunity</button></div>`).join('')}</div>`}
+function donatePage(){return `${pageIntro('Support access','Donate to us','Help keep student resources accessible and support scholarships, study tools and community programs.')}<div class="grid grid-2"><div class="hero-card" style="min-height:280px"><div class="eyebrow" style="color:#bfdbfe">Community funded</div><h1 style="font-size:42px">Students helping students.</h1><p>Your support can fund learning materials, emergency grants and community programs.</p><button class="btn btn-light">Support Colleage</button></div><div class="card"><h3>Where support goes</h3>${[['Learning resources','Free notes, flashcards and tools'],['Student assistance','Small grants for learners'],['Community programs','Mentoring and volunteering']].map(x=>`<div class="resource-row" style="margin-top:10px"><div class="resource-icon">${icon('heart')}</div><div class="resource-copy"><strong>${x[0]}</strong><span>${x[1]}</span></div></div>`).join('')}</div></div>`}
+function profilePage(){return `${pageIntro('Your identity','Profile','Manage your academic identity, active course and learning record.')}<div class="profile-layout"><div class="card profile-hero"><div class="avatar">HK</div><h3>Hatem Khalifa</h3><p class="muted" style="font-size:10px">Medicine · Stage 2</p><span class="tag green">Active student</span><div class="profile-stats"><div><b>8</b><span>Day streak</span></div><div><b>64%</b><span>Course</span></div><div><b>86.8</b><span>Average</span></div></div></div><div class="card"><h3>Academic profile</h3><div class="settings-list" style="margin-top:14px">${[['Active course','Medicine · Stage 2'],['University','Not connected yet'],['Study goal','15 hours/week'],['Public courses','2 available slots']].map(x=>`<div class="setting-row"><div><strong>${x[0]}</strong><small>${x[1]}</small></div><button class="btn btn-ghost">Edit</button></div>`).join('')}</div></div></div>`}
+function settingsPage(){return `${pageIntro('Preferences','Settings','Control notifications, appearance, privacy and study preferences.')}<div class="settings-list">${[['Study reminders','Get reminders before scheduled study blocks',true],['Community replies','Notify me when someone replies to my posts',true],['Weekly progress email','Receive a weekly learning summary',false],['Compact dashboard','Reduce card spacing on desktop',false]].map(x=>`<div class="setting-row"><div><strong>${x[0]}</strong><small>${x[1]}</small></div><button class="toggle ${x[2]?'on':''}"><span></span></button></div>`).join('')}</div>`}
+function render(){if(state.route==='dashboard')content.innerHTML=dashboard();else if(state.route==='subjects')content.innerHTML=subjectsPage();else if(state.route==='schedule')content.innerHTML=schedulePage();else if(state.route==='rooms')content.innerHTML=roomsPage();else if(state.route==='community')content.innerHTML=communityPage();else if(state.route==='jobs'||state.route==='scholarships')content.innerHTML=opportunityPage(state.route);else if(state.route==='volunteer')content.innerHTML=volunteerPage();else if(state.route==='donate')content.innerHTML=donatePage();else if(state.route==='profile')content.innerHTML=profilePage();else if(state.route==='settings')content.innerHTML=settingsPage();bindCommon()}
+function openModal(html){modalContent.innerHTML=html;modal.showModal()}
+function bindCommon(){document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>setRoute(b.dataset.go));document.querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>subjectDetail(b.dataset.subject));document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.subjectTab=b.dataset.tab;render()});document.querySelectorAll('.schedule-done').forEach(b=>b.onclick=()=>{b.innerHTML=`${icon('check')} Completed`;b.disabled=true;toast('Study block completed')});document.querySelectorAll('.room-btn').forEach(b=>b.onclick=()=>{const id=Number(b.dataset.room);state.joinedRooms.has(id)?state.joinedRooms.delete(id):state.joinedRooms.add(id);render();toast(state.joinedRooms.has(id)?'Joined study room':'Left study room')});document.querySelectorAll('.toggle').forEach(b=>b.onclick=()=>b.classList.toggle('on'));const search=document.getElementById('subjectSearch');if(search)search.oninput=e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('.subject-card').forEach(c=>c.style.display=c.innerText.toLowerCase().includes(q)?'flex':'none')};const addSubject=document.getElementById('addSubject');if(addSubject)addSubject.onclick=()=>openModal('<div class="eyebrow">Manager tool</div><h2>Add subject</h2><div class="form-grid"><input placeholder="Subject name"><input placeholder="Subject code"><button class="btn btn-primary" id="saveSimple" type="button">Create subject</button></div>');const addSchedule=document.getElementById('addSchedule');if(addSchedule)addSchedule.onclick=()=>openModal('<div class="eyebrow">Schedule</div><h2>New study block</h2><div class="form-grid"><input placeholder="Title"><input type="time"><select><option>Study</option><option>Lecture</option><option>Quiz</option></select><button class="btn btn-primary" id="saveSimple" type="button">Add to schedule</button></div>');const createRoom=document.getElementById('createRoom');if(createRoom)createRoom.onclick=()=>openModal('<div class="eyebrow">Study rooms</div><h2>Create a room</h2><div class="form-grid"><input placeholder="Room name"><input placeholder="Topic"><button class="btn btn-primary" id="saveSimple" type="button">Create room</button></div>');const newPost=document.getElementById('newPost');if(newPost)newPost.onclick=()=>openModal('<div class="eyebrow">Community</div><h2>Share with your course</h2><div class="form-grid"><textarea id="postText" placeholder="Ask a question or share a useful resource..."></textarea><button class="btn btn-primary" type="button" id="publishPost">Publish post</button></div>');setTimeout(()=>{const save=document.getElementById('saveSimple');if(save)save.onclick=()=>{modal.close();toast('Saved successfully')};const pub=document.getElementById('publishPost');if(pub)pub.onclick=()=>{const t=document.getElementById('postText').value.trim();if(t){posts.unshift({name:'Hatem Khalifa',initials:'HK',text:t,meta:'Just now · General'});modal.close();render();toast('Post published')}}},0)}
+document.querySelectorAll('.nav-link').forEach(b=>b.onclick=()=>setRoute(b.dataset.route));document.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>setRoute(b.dataset.side));document.getElementById('mobileMenu').onclick=()=>{document.getElementById('sidebar').classList.add('open');document.getElementById('mobileBackdrop').classList.add('show')};document.getElementById('mobileBackdrop').onclick=closeMobile;document.getElementById('roleToggle').onclick=()=>{state.manager=!state.manager;document.body.classList.toggle('manager',state.manager);document.getElementById('roleLabel').textContent=state.manager?'Manager':'Student';toast(`${state.manager?'Manager':'Student'} mode active`);render()};document.getElementById('searchBtn').onclick=()=>{setRoute('subjects');setTimeout(()=>document.getElementById('subjectSearch')?.focus(),40)};document.getElementById('notificationBtn').onclick=()=>toast('You have 3 new study updates');document.getElementById('courseButton').onclick=()=>toast('Course switcher is ready for course data integration');modal.addEventListener('click',e=>{if(e.target===modal)modal.close()});document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){e.preventDefault();document.getElementById('searchBtn').click()}});render();
