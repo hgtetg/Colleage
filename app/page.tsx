@@ -157,7 +157,7 @@ function PageTitle({ eyebrow, title, description, action }: { eyebrow: string; t
 
 function Dashboard({ onManage, code }: { onManage: () => void; code: string }) {
   return <>
-    <PageTitle eyebrow="SATURDAY · 29 AUGUST 2026" title="Morning, Layla." description="Your course ledger is tidy. Here’s what needs your attention today." action={<button className="primary-button" type="button" onClick={onManage}><BarChart3 size={17} /> Manage course</button>} />
+    <PageTitle eyebrow="SATURDAY · 29 AUGUST 2026" title="Morning, Layla." description="Everything is on track. Here’s what needs your attention today." action={<button className="primary-button" type="button" onClick={onManage}><BarChart3 size={17} /> Manage course</button>} />
     <section className="metric-grid" aria-label="Course summary">
       <article className="metric-card feature-card"><div className="metric-head"><span>My attendance</span><span className="trend">+2.4%</span></div><div className="metric-value">92%</div><div className="progress"><span style={{ width: '92%' }} /></div><p>Excellent standing · last 6 weeks</p></article>
       <article className="metric-card"><div className="metric-head"><span>Lectures viewed</span><BookOpen size={17} /></div><div className="metric-value">14 <small>/ 16</small></div><p>2 materials waiting this week</p></article>
@@ -180,7 +180,7 @@ function Subjects() {
 
 function Schedule() {
   const weekdays = ['Sunday 30', 'Monday 31', 'Tuesday 01', 'Wednesday 02', 'Thursday 03'];
-  return <><PageTitle eyebrow="ACADEMIC WEEK 06" title="Your week, at a glance" description="Classes, study sessions, exams and deadlines in one ruled timetable." action={<button className="secondary-button" type="button"><Download size={16} /> Export .ics</button>} />
+  return <><PageTitle eyebrow="ACADEMIC WEEK 06" title="Your week, at a glance" description="Classes, study sessions, exams and deadlines in one clear schedule." action={<button className="secondary-button" type="button"><Download size={16} /> Export .ics</button>} />
     <article className="ledger-card calendar-panel"><div className="calendar-head"><span>GMT+3</span>{weekdays.map((day) => <strong key={day}>{day}</strong>)}</div>{['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'].map((time, row) => <div className="calendar-row" key={time}><span>{time}</span>{weekdays.map((day, col) => { const matches = (row === 0 && col === 1) || (row === 1 && col === 2) || (row === 2 && col === 0) || (row === 4 && col === 3); return <div key={day}>{matches && <button className={row === 4 ? 'calendar-event amber' : 'calendar-event'} type="button"><strong>{row === 4 ? 'Study room' : row === 2 ? 'Discrete Math' : 'DSA class'}</strong><small>{row === 4 ? 'Library Pod 3' : 'Main campus'}</small></button>}</div>; })}</div>)}</article>
     <div className="deadline-strip"><article><span className="deadline-date">SEP<br /><strong>03</strong></span><div><span className="eyebrow">UPCOMING DEADLINE</span><h3>Graph theory problem set</h3><p>Discrete Mathematics · due at 23:59</p></div><span className="warning-pill">5 DAYS</span></article><article><span className="deadline-date exam">SEP<br /><strong>08</strong></span><div><span className="eyebrow">EXAM</span><h3>Operating Systems quiz</h3><p>Lab 2 · 10:00–10:45</p></div><span className="warning-pill">10 DAYS</span></article></div>
   </>;
