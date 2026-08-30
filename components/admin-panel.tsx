@@ -1,5 +1,7 @@
 'use client';
 
+/* oxlint-disable next/no-html-link-for-pages -- Native links avoid a Vinext production navigation crash. */
+
 import {
   BookOpen,
   LayoutDashboard,
@@ -7,7 +9,6 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { CampusState } from '@/lib/campus-db';
 
@@ -45,7 +46,7 @@ export default function AdminPanel() {
       <AdminMessage
         title="Administrator sign-in required"
         text="Sign in with an administrator account to continue."
-        action={<Link href="/signin">Sign in</Link>}
+        action={<a href="/signin">Sign in</a>}
       />
     );
   if (state.viewer.role !== 'admin')
@@ -53,15 +54,15 @@ export default function AdminPanel() {
       <AdminMessage
         title="Administrator access only"
         text="Representatives manage their courses directly inside each course page. This system panel is reserved for platform administrators."
-        action={<Link href="/app">Return to workspace</Link>}
+        action={<a href="/app">Return to workspace</a>}
       />
     );
   return (
     <main className="admin-shell">
       <aside className="admin-sidebar">
-        <Link className="marketing-logo inverse" href="/">
+        <a className="marketing-logo inverse" href="/">
           <span>CH</span>Campus Hub
-        </Link>
+        </a>
         <nav>
           <a className="active" href="#overview">
             <LayoutDashboard size={17} />
@@ -91,9 +92,9 @@ export default function AdminPanel() {
             <h1>Campus Hub overview</h1>
             <p>System-level visibility across accounts, courses and access.</p>
           </div>
-          <Link className="admin-secondary" href="/app">
+          <a className="admin-secondary" href="/app">
             Open workspace
-          </Link>
+          </a>
         </header>
         <div className="admin-metrics" id="overview">
           <article>
@@ -161,10 +162,10 @@ export default function AdminPanel() {
             ))}
           </div>
         </section>
-        <Link className="admin-signout" href="/app">
+        <a className="admin-signout" href="/app">
           <LogOut size={15} />
           Account controls are available in the workspace
-        </Link>
+        </a>
       </section>
     </main>
   );
@@ -181,9 +182,9 @@ function AdminMessage({
 }) {
   return (
     <main className="admin-message">
-      <Link className="marketing-logo" href="/">
+      <a className="marketing-logo" href="/">
         <span>CH</span>Campus Hub
-      </Link>
+      </a>
       <div>
         <ShieldCheck size={34} />
         <h1>{title}</h1>

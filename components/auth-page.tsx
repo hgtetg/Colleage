@@ -1,5 +1,7 @@
 'use client';
 
+/* oxlint-disable next/no-html-link-for-pages -- Native links avoid a Vinext production navigation crash. */
+
 import {
   ArrowLeft,
   Check,
@@ -8,12 +10,9 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
-  const router = useRouter();
   const [role, setRole] = useState<'student' | 'representative'>('student');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -42,8 +41,7 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
       const result = (await response.json()) as { error?: string };
       if (!response.ok)
         throw new Error(result.error || 'We could not complete that request.');
-      router.push('/app');
-      router.refresh();
+      window.location.assign('/app');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
@@ -54,9 +52,9 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
   return (
     <main className="auth-page-shell">
       <section className="auth-brand-panel">
-        <Link className="auth-back" href="/">
+        <a className="auth-back" href="/">
           <ArrowLeft size={16} /> Back to Campus Hub
-        </Link>
+        </a>
         <div>
           <span className="marketing-kicker">A BETTER ACADEMIC DAY</span>
           <h1>
@@ -93,9 +91,9 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
       </section>
       <section className="auth-form-panel">
         <div className="auth-form-wrap">
-          <Link className="marketing-logo" href="/">
+          <a className="marketing-logo" href="/">
             <span>CH</span>Campus Hub
-          </Link>
+          </a>
           <span className="marketing-kicker">
             {mode === 'signin' ? 'SECURE SIGN IN' : 'CREATE ACCOUNT'}
           </span>
@@ -205,9 +203,9 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
             {mode === 'signin'
               ? 'New to Campus Hub?'
               : 'Already have an account?'}{' '}
-            <Link href={mode === 'signin' ? '/signup' : '/signin'}>
+            <a href={mode === 'signin' ? '/signup' : '/signin'}>
               {mode === 'signin' ? 'Create an account' : 'Sign in'}
-            </Link>
+            </a>
           </p>
         </div>
       </section>

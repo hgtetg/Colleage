@@ -1,3 +1,5 @@
+/* oxlint-disable next/no-html-link-for-pages -- Native links avoid a Vinext production navigation crash. */
+
 import {
   ArrowRight,
   BookOpen,
@@ -10,27 +12,26 @@ import {
   Users,
 } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
 
 export default function LandingPage() {
   return (
     <main className="marketing-page">
       <nav className="marketing-nav">
-        <Link className="marketing-logo" href="/">
+        <a className="marketing-logo" href="/">
           <span>CH</span>Campus Hub
-        </Link>
+        </a>
         <div className="marketing-links">
           <a href="#platform">Platform</a>
           <a href="#roles">For students</a>
           <a href="#roles">For representatives</a>
         </div>
         <div className="marketing-actions">
-          <Link className="marketing-signin" href="/signin">
+          <a className="marketing-signin" href="/signin">
             Sign in
-          </Link>
-          <Link className="marketing-cta small" href="/signup">
+          </a>
+          <a className="marketing-cta small" href="/signup">
             Create account <ArrowRight size={15} />
-          </Link>
+          </a>
         </div>
       </nav>
       <section className="marketing-hero">
@@ -45,12 +46,12 @@ export default function LandingPage() {
             student opportunities organized around your real course community.
           </p>
           <div className="hero-actions">
-            <Link className="marketing-cta" href="/signup">
+            <a className="marketing-cta" href="/signup">
               Join your course <ArrowRight size={17} />
-            </Link>
-            <Link className="marketing-demo" href="/signin">
+            </a>
+            <a className="marketing-demo" href="/signin">
               Try a test account
-            </Link>
+            </a>
           </div>
           <div className="hero-trust">
             <span>
@@ -229,9 +230,9 @@ export default function LandingPage() {
                 Apply for opportunities
               </li>
             </ul>
-            <Link href="/signup">
+            <a href="/signup">
               Create student account <ArrowRight size={15} />
-            </Link>
+            </a>
           </article>
           <article className="representative">
             <Users />
@@ -255,9 +256,9 @@ export default function LandingPage() {
                 Manage course access
               </li>
             </ul>
-            <Link href="/signup">
+            <a href="/signup">
               Create representative account <ArrowRight size={15} />
-            </Link>
+            </a>
           </article>
         </div>
       </section>
@@ -277,23 +278,23 @@ export default function LandingPage() {
           Create your account with the code from your course representative.
         </p>
         <div>
-          <Link className="marketing-cta" href="/signup">
+          <a className="marketing-cta" href="/signup">
             Get started free <ArrowRight size={17} />
-          </Link>
-          <Link className="marketing-signin" href="/signin">
+          </a>
+          <a className="marketing-signin" href="/signin">
             I already have an account
-          </Link>
+          </a>
         </div>
       </section>
       <footer>
-        <Link className="marketing-logo inverse" href="/">
+        <a className="marketing-logo inverse" href="/">
           <span>CH</span>Campus Hub
-        </Link>
+        </a>
         <p>Student-led course organization, built with care.</p>
         <div>
-          <Link href="/signin">Sign in</Link>
-          <Link href="/signup">Create account</Link>
-          <Link href="/admin">Administration</Link>
+          <a href="/signin">Sign in</a>
+          <a href="/signup">Create account</a>
+          <a href="/admin">Administration</a>
         </div>
       </footer>
     </main>
