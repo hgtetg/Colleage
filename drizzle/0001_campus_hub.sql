@@ -1,108 +1,33 @@
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  full_name TEXT NOT NULL,
-  initials TEXT NOT NULL,
-  university TEXT NOT NULL DEFAULT 'Baghdad Technical University',
-  college TEXT NOT NULL DEFAULT 'College of Computing',
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS courses (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  year_label TEXT NOT NULL,
-  section_label TEXT NOT NULL,
-  institution TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS memberships (
-  user_id TEXT NOT NULL,
-  course_id TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('student', 'representative')),
-  joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, course_id),
-  FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (course_id) REFERENCES courses(id)
-);
-CREATE TABLE IF NOT EXISTS sessions (
-  token TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS join_codes (
-  id TEXT PRIMARY KEY,
-  course_id TEXT NOT NULL,
-  code TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL CHECK(role IN ('student', 'representative')),
-  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'paused', 'invalid')),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (course_id) REFERENCES courses(id)
-);
-CREATE TABLE IF NOT EXISTS subjects (
-  id TEXT PRIMARY KEY,
-  course_id TEXT NOT NULL,
-  name TEXT NOT NULL,
-  code TEXT NOT NULL,
-  color TEXT NOT NULL,
-  lectures INTEGER NOT NULL DEFAULT 0,
-  viewed INTEGER NOT NULL DEFAULT 0,
-  next_topic TEXT NOT NULL DEFAULT '',
-  initials TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (course_id) REFERENCES courses(id)
-);
-CREATE TABLE IF NOT EXISTS schedule_entries (
-  id TEXT PRIMARY KEY,
-  course_id TEXT NOT NULL,
-  starts_at TEXT NOT NULL,
-  title TEXT NOT NULL,
-  location TEXT NOT NULL,
-  tone TEXT NOT NULL DEFAULT 'teal',
-  entry_type TEXT NOT NULL DEFAULT 'class',
-  FOREIGN KEY (course_id) REFERENCES courses(id)
-);
-CREATE TABLE IF NOT EXISTS rooms (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  room_type TEXT NOT NULL,
-  capacity INTEGER NOT NULL,
-  availability TEXT NOT NULL,
-  tone TEXT NOT NULL DEFAULT 'available'
-);
-CREATE TABLE IF NOT EXISTS bookings (
-  id TEXT PRIMARY KEY,
-  room_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  starts_at TEXT NOT NULL,
-  ends_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (room_id) REFERENCES rooms(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS posts (
-  id TEXT PRIMARY KEY,
-  course_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  body TEXT NOT NULL,
-  pinned INTEGER NOT NULL DEFAULT 0,
-  helpful_count INTEGER NOT NULL DEFAULT 0,
-  reply_count INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (course_id) REFERENCES courses(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id TEXT PRIMARY KEY,
-  course_id TEXT NOT NULL,
-  user_id TEXT,
-  action TEXT NOT NULL,
-  detail TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_memberships_course ON memberships(course_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_schedule_course_time ON schedule_entries(course_id, starts_at);
-CREATE INDEX IF NOT EXISTS idx_bookings_user_time ON bookings(user_id, starts_at);
-CREATE INDEX IF NOT EXISTS idx_posts_course_time ON posts(course_id, created_at DESC);
+PRAGMA foreign_keys = ON;
+CREATE TABLE users (id TEXT PRIMARY KEY,email TEXT NOT NULL UNIQUE,password_hash TEXT NOT NULL,password_salt TEXT NOT NULL,full_name TEXT NOT NULL,initials TEXT NOT NULL,university TEXT NOT NULL DEFAULT 'Baghdad Technical University',college TEXT NOT NULL DEFAULT 'College of Computing',stage TEXT NOT NULL DEFAULT 'Year 2',field TEXT NOT NULL DEFAULT 'Software Engineering',bio TEXT NOT NULL DEFAULT '',avatar_key TEXT,email_verified INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended','deleted')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE courses (id TEXT PRIMARY KEY,name TEXT NOT NULL,year_label TEXT NOT NULL,section_label TEXT NOT NULL,institution TEXT NOT NULL,college TEXT NOT NULL DEFAULT 'College of Computing',description TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE memberships (user_id TEXT NOT NULL,course_id TEXT NOT NULL,role TEXT NOT NULL CHECK(role IN ('student','representative','admin')),attendance INTEGER NOT NULL DEFAULT 0,joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(user_id,course_id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE);
+CREATE TABLE sessions (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE auth_attempts (attempt_key TEXT PRIMARY KEY,count INTEGER NOT NULL DEFAULT 0,window_started_at TEXT NOT NULL,blocked_until TEXT);
+CREATE TABLE password_reset_tokens (token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE join_codes (id TEXT PRIMARY KEY,course_id TEXT NOT NULL,code TEXT NOT NULL UNIQUE,role TEXT NOT NULL CHECK(role IN ('student','representative')),status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','paused','invalid')),max_uses INTEGER,use_count INTEGER NOT NULL DEFAULT 0,expires_at TEXT,created_by TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE);
+CREATE TABLE subjects (id TEXT PRIMARY KEY,course_id TEXT NOT NULL,name TEXT NOT NULL,code TEXT NOT NULL,color TEXT NOT NULL DEFAULT 'teal',next_topic TEXT NOT NULL DEFAULT '',initials TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE);
+CREATE TABLE lectures (id TEXT PRIMARY KEY,subject_id TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL DEFAULT '',position INTEGER NOT NULL DEFAULT 0,published INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE);
+CREATE TABLE lecture_progress (user_id TEXT NOT NULL,lecture_id TEXT NOT NULL,completed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(user_id,lecture_id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,FOREIGN KEY(lecture_id) REFERENCES lectures(id) ON DELETE CASCADE);
+CREATE TABLE materials (id TEXT PRIMARY KEY,subject_id TEXT NOT NULL,title TEXT NOT NULL,material_type TEXT NOT NULL DEFAULT 'link',url TEXT,object_key TEXT,size_bytes INTEGER,uploaded_by TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE);
+CREATE TABLE schedule_entries (id TEXT PRIMARY KEY,course_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,title TEXT NOT NULL,location TEXT NOT NULL,tone TEXT NOT NULL DEFAULT 'teal',entry_type TEXT NOT NULL DEFAULT 'class',notes TEXT NOT NULL DEFAULT '',created_by TEXT,FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE);
+CREATE TABLE rooms (id TEXT PRIMARY KEY,name TEXT NOT NULL,room_type TEXT NOT NULL,capacity INTEGER NOT NULL,availability TEXT NOT NULL,tone TEXT NOT NULL DEFAULT 'available',meeting_url TEXT);
+CREATE TABLE bookings (id TEXT PRIMARY KEY,room_id TEXT NOT NULL,user_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,purpose TEXT NOT NULL DEFAULT 'Study session',status TEXT NOT NULL DEFAULT 'confirmed' CHECK(status IN ('confirmed','cancelled')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(room_id) REFERENCES rooms(id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE posts (id TEXT PRIMARY KEY,course_id TEXT NOT NULL,user_id TEXT NOT NULL,body TEXT NOT NULL,pinned INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(course_id) REFERENCES courses(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE post_reactions (post_id TEXT NOT NULL,user_id TEXT NOT NULL,reaction TEXT NOT NULL DEFAULT 'helpful',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(post_id,user_id,reaction),FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE post_replies (id TEXT PRIMARY KEY,post_id TEXT NOT NULL,user_id TEXT NOT NULL,body TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE opportunities (id TEXT PRIMARY KEY,kind TEXT NOT NULL CHECK(kind IN ('work','scholarship','volunteer')),title TEXT NOT NULL,organization TEXT NOT NULL,description TEXT NOT NULL,location TEXT NOT NULL,deadline TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE applications (id TEXT PRIMARY KEY,opportunity_id TEXT NOT NULL,user_id TEXT NOT NULL,statement TEXT NOT NULL,phone TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'submitted' CHECK(status IN ('draft','submitted','reviewing','accepted','declined')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(opportunity_id,user_id),FOREIGN KEY(opportunity_id) REFERENCES opportunities(id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE donations (id TEXT PRIMARY KEY,user_id TEXT,email TEXT NOT NULL,amount INTEGER NOT NULL,currency TEXT NOT NULL DEFAULT 'usd',stripe_session_id TEXT UNIQUE,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','paid','failed','refunded')),created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,paid_at TEXT,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL);
+CREATE TABLE user_settings (user_id TEXT PRIMARY KEY,announcements INTEGER NOT NULL DEFAULT 1,reminders INTEGER NOT NULL DEFAULT 1,product_updates INTEGER NOT NULL DEFAULT 0,language TEXT NOT NULL DEFAULT 'en',theme TEXT NOT NULL DEFAULT 'system',profile_visibility TEXT NOT NULL DEFAULT 'course',FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE notifications (id TEXT PRIMARY KEY,user_id TEXT NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,target TEXT,read_at TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
+CREATE TABLE audit_logs (id TEXT PRIMARY KEY,course_id TEXT,user_id TEXT,action TEXT NOT NULL,detail TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX idx_sessions_user_expiry ON sessions(user_id,expires_at); CREATE INDEX idx_memberships_course ON memberships(course_id,role); CREATE INDEX idx_join_codes_lookup ON join_codes(code,status); CREATE INDEX idx_lectures_subject ON lectures(subject_id,position); CREATE INDEX idx_schedule_course_time ON schedule_entries(course_id,starts_at); CREATE INDEX idx_bookings_room_time ON bookings(room_id,starts_at,ends_at); CREATE INDEX idx_posts_course_time ON posts(course_id,created_at DESC); CREATE INDEX idx_replies_post_time ON post_replies(post_id,created_at); CREATE INDEX idx_opportunities_kind ON opportunities(kind,status,deadline); CREATE INDEX idx_applications_user ON applications(user_id,created_at DESC); CREATE INDEX idx_notifications_user ON notifications(user_id,read_at,created_at DESC);
+INSERT INTO courses (id,name,year_label,section_label,institution,college,description) VALUES ('software-engineering-y2-a','Software Engineering','Year 2','Section A','Baghdad Technical University','College of Computing','The shared home for Section A coursework, schedules and community.');
+INSERT INTO join_codes (id,course_id,code,role,status,max_uses) VALUES ('code-student','software-engineering-y2-a','DSA2-K7Q1','student','active',500),('code-representative','software-engineering-y2-a','REP-SE2-4MK','representative','active',10);
+INSERT INTO subjects (id,course_id,name,code,color,next_topic,initials) VALUES ('subject-dsa','software-engineering-y2-a','Data Structures','CSE 221','teal','Trees & traversals','DS'),('subject-dm','software-engineering-y2-a','Discrete Mathematics','MTH 204','amber','Graph theory','DM'),('subject-os','software-engineering-y2-a','Operating Systems','CSE 231','brick','Process scheduling','OS'),('subject-tw','software-engineering-y2-a','Technical Writing','ENG 207','navy','Research abstracts','TW');
+INSERT INTO lectures (id,subject_id,title,summary,position) VALUES ('lec-dsa-1','subject-dsa','Arrays and complexity','Big-O, memory layout and practical analysis.',1),('lec-dsa-2','subject-dsa','Linked lists','Singly, doubly and circular linked lists.',2),('lec-dsa-3','subject-dsa','Trees and traversals','Binary trees, BFS and DFS traversal.',3),('lec-dm-1','subject-dm','Logic and proof','Propositions, inference and proof strategies.',1),('lec-dm-2','subject-dm','Graph theory','Vertices, edges and common algorithms.',2),('lec-os-1','subject-os','Processes','Process states and context switching.',1),('lec-os-2','subject-os','CPU scheduling','FCFS, SJF and round-robin scheduling.',2),('lec-tw-1','subject-tw','Research abstracts','Writing clear academic abstracts.',1);
+INSERT INTO materials (id,subject_id,title,material_type,url,size_bytes) VALUES ('mat-dsa-tree','subject-dsa','Tree traversal practice','link','https://en.wikipedia.org/wiki/Tree_traversal',2457600),('mat-dm-graph','subject-dm','Graph theory reference','link','https://en.wikipedia.org/wiki/Graph_theory',0),('mat-os-sheet','subject-os','CPU scheduling lab sheet','link','https://en.wikipedia.org/wiki/Scheduling_(computing)',1126400);
+INSERT INTO schedule_entries (id,course_id,starts_at,ends_at,title,location,tone,entry_type,notes) VALUES ('schedule-dm','software-engineering-y2-a','2026-08-30T09:00:00+03:00','2026-08-30T10:00:00+03:00','Discrete Math','Hall 3','teal','class','Bring the problem set.'),('schedule-os','software-engineering-y2-a','2026-08-31T11:00:00+03:00','2026-08-31T12:30:00+03:00','Operating Systems','Lab 2','amber','class','CPU scheduling lab.'),('schedule-dsa','software-engineering-y2-a','2026-09-01T10:00:00+03:00','2026-09-01T11:00:00+03:00','DSA recitation','Room B12','teal','class','Room changed from B10.'),('schedule-study','software-engineering-y2-a','2026-09-02T14:00:00+03:00','2026-09-02T15:30:00+03:00','Open study block','Library','plain','study','Open peer study session.');
+INSERT INTO rooms (id,name,room_type,capacity,availability,tone,meeting_url) VALUES ('room-b12','Study Room B12','Physical room',6,'Available until 16:00','available',NULL),('room-pod-3','Library Pod 3','Physical room',4,'Available at 14:30','soon',NULL),('room-team-a','Team A Virtual Room','Online room',99,'Open all day','available','https://meet.jit.si/campus-hub-team-a');
+INSERT INTO opportunities (id,kind,title,organization,description,location,deadline) VALUES ('opp-work-product','work','Junior Product Assistant','Campus Labs','Support user research, documentation and product operations in a student-friendly hybrid role.','Baghdad · Hybrid','2026-09-14T23:59:00+03:00'),('opp-scholarship-engineers','scholarship','Future Engineers Grant 2026','Iraq Technology Foundation','Funding for promising computing students with strong community impact.','Iraq · National','2026-10-01T23:59:00+03:00'),('opp-volunteer-tutor','volunteer','Peer Tutoring Week','Campus Hub Community','Help first-year students prepare for programming and mathematics assessments.','On campus','2026-09-20T23:59:00+03:00');
