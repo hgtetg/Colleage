@@ -492,3 +492,12 @@ h1 { font-size: clamp(34px,3.8vw,48px); font-weight: 760; line-height: 1.03; }
 
 @media(max-width:1050px){.subject-grid,.room-grid{gap:14px}}
 @media(max-width:760px){.how-grid{padding:14px}.landing-hero{padding-top:48px}.hero-ledger{transform:none}}
+
+/* Live application states */
+.header-join{width:auto!important;padding:0 14px!important;border-radius:999px!important;background:var(--teal)!important;color:#fff!important;font-size:12px!important;font-weight:800!important}
+.live-banner{display:flex;align-items:center;justify-content:center;gap:9px;max-width:680px;margin:0 auto 22px;padding:11px 16px;border:1px solid color-mix(in srgb,var(--teal) 28%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--teal) 8%,var(--paper));color:var(--ink);font-size:13px;font-weight:700}
+.live-banner.notice{justify-content:space-between}.live-banner button{border:0;background:transparent;color:inherit;cursor:pointer}.spin{animation:campus-spin 1s linear infinite}@keyframes campus-spin{to{transform:rotate(360deg)}}
+.join-feed{width:100%;align-items:center;justify-content:flex-start;text-align:left;cursor:pointer}.join-feed>span{display:grid;gap:3px}.join-feed small{color:var(--muted)}
+.identity-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field-label>input{width:100%;margin-top:8px;padding:13px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;outline:none}.field-label>input:focus{border-color:var(--teal);box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 12%,transparent)}
+.empty-profile{max-width:720px;margin:0 auto;padding:50px;text-align:center}.empty-profile svg{color:var(--teal)}
+@media(max-width:680px){.identity-fields{grid-template-columns:1fr}.header-join{display:none!important}}
