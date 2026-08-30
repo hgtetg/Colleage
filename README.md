@@ -1,23 +1,53 @@
-# Colleage
+# Campus Hub
 
-Colleage is a responsive study workspace for students and student-managers.
+Campus Hub is a production-ready student course workspace built with React, Vinext, and Cloudflare Workers.
 
-## Included in this first build
+## What works
 
-- Dashboard with study focus, progress and upcoming work
-- Subjects with Subjects / Degrees / Analytics tabs
-- Clickable subject workspaces with lectures, progress and grades
-- Schedule with interactive completion state
-- Study rooms with join / leave interactions
-- Community feed with working post creation
-- Sidebar routes for jobs, scholarships, volunteering, donations, profile and settings
-- Student / Manager role toggle with manager-only content controls
-- Responsive desktop, tablet and mobile navigation
+- Secure email/password account creation and sign-in
+- Salted PBKDF2 password hashing, hashed sessions, same-origin checks, and sign-in rate limits
+- Course-code enrollment with student and representative permissions
+- Subjects, lectures, completion tracking, materials, schedules, and calendar export
+- Study-room booking and private course community posts, reactions, and replies
+- Representative roster, CSV export, course access-code controls, and audit records
+- Student work, scholarship, and volunteer applications with status tracking
+- Editable profiles, private R2 profile-photo storage, settings, and notifications
+- Stripe Checkout donation flow and verified payment webhook
+- Persistent data in Cloudflare D1 and private files in Cloudflare R2
 
-## Run locally
+## Local development
 
-No build step is required. Open `index.html` in a browser, or serve the directory with any static web server.
+```bash
+pnpm install
+pnpm run db:migrate:local
+pnpm run dev
+```
 
-## Architecture
+Student course code: `DSA2-K7Q1`
 
-This initial version is intentionally framework-free (`index.html`, `styles.css`, `app.js`) so the product flow can be reviewed quickly. The data currently lives in browser-side demo state and is structured for a later backend/authentication integration.
+Representative course code: `REP-SE2-4MK`
+
+## Cloudflare deployment
+
+```bash
+pnpm run db:migrate:remote
+pnpm run deploy
+```
+
+The checked-in Cloudflare configuration binds:
+
+- D1 database `campus-hub-db` as `DB`
+- R2 bucket `campus-hub-files` as `FILES`
+
+To accept real donations, add the following encrypted Worker secrets:
+
+```bash
+wrangler secret put STRIPE_SECRET_KEY
+wrangler secret put STRIPE_WEBHOOK_SECRET
+```
+
+Then register `/api/donations/webhook` as a Stripe webhook endpoint for the `checkout.session.completed` event. Never commit secret values to Git.
+
+## Continuous deployment
+
+Connect this repository in Cloudflare Workers Builds. Use `pnpm run deploy` as the deploy command and `main` as the production branch. D1 migrations should be reviewed and applied before an incompatible schema release.
