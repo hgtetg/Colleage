@@ -20,28 +20,56 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeDemo, setActiveDemo] = useState<
+    'student' | 'representative' | null
+  >(null);
+
+  const authenticate = async (details: Record<string, string>) => {
+    const response = await fetch('/api/campus', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(details),
+    });
+    const result = (await response.json()) as { error?: string };
+    if (!response.ok)
+      throw new Error(result.error || 'We could not complete that request.');
+    window.location.assign('/app');
+  };
+
+  const openDemo = async (demoRole: 'student' | 'representative') => {
+    setLoading(true);
+    setActiveDemo(demoRole);
+    setError('');
+    try {
+      await authenticate({
+        action: 'login',
+        email:
+          demoRole === 'student'
+            ? 'student@campushub.test'
+            : 'representative@campushub.test',
+        password: demoRole === 'student' ? 'StudentTest2026!' : 'RepTest2026!',
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Please try again.');
+      setLoading(false);
+      setActiveDemo(null);
+    }
+  };
 
   const submit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
+    setActiveDemo(null);
     setError('');
     try {
-      const response = await fetch('/api/campus', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: mode === 'signin' ? 'login' : 'signup',
-          fullName,
-          email,
-          password,
-          code,
-          role,
-        }),
+      await authenticate({
+        action: mode === 'signin' ? 'login' : 'signup',
+        fullName,
+        email,
+        password,
+        code,
+        role,
       });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok)
-        throw new Error(result.error || 'We could not complete that request.');
-      window.location.assign('/app');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Please try again.');
     } finally {
@@ -107,6 +135,40 @@ export default function AuthPage({ mode }: { mode: 'signin' | 'signup' }) {
               ? 'Use your account email and password.'
               : 'Create your account with the code from your representative.'}
           </p>
+          {mode === 'signin' && (
+            <div className="demo-access" aria-label="Demo accounts">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void openDemo('student')}
+              >
+                <GraduationCap size={18} />
+                <span>
+                  <strong>
+                    {activeDemo === 'student'
+                      ? 'Opening demo…'
+                      : 'Demo student'}
+                  </strong>
+                  <small>View the student workspace</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void openDemo('representative')}
+              >
+                <Users size={18} />
+                <span>
+                  <strong>
+                    {activeDemo === 'representative'
+                      ? 'Opening demo…'
+                      : 'Demo representative'}
+                  </strong>
+                  <small>Try inline course controls</small>
+                </span>
+              </button>
+            </div>
+          )}
           <form className="standalone-auth-form" onSubmit={submit}>
             {mode === 'signup' && (
               <>

@@ -4226,6 +4226,10 @@ h1 {
   color: var(--m-ink);
   text-align: left;
 }
+.demo-access button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .demo-access svg {
   color: var(--m-blue);
 }
