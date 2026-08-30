@@ -567,6 +567,46 @@ export async function POST(request: Request) {
         { error: 'Representative permission is required.' },
         { status: 403 },
       );
+    if (action === 'update_course') {
+      const name = value(body.name),
+        yearLabel = value(body.yearLabel),
+        sectionLabel = value(body.sectionLabel),
+        institution = value(body.institution),
+        college = value(body.college),
+        description = value(body.description);
+      if (
+        name.length < 2 ||
+        yearLabel.length < 2 ||
+        sectionLabel.length < 2 ||
+        institution.length < 2 ||
+        college.length < 2
+      )
+        return json(
+          { error: 'Complete all required course details.' },
+          { status: 400 },
+        );
+      await db
+        .prepare(
+          `UPDATE courses SET name=?,year_label=?,section_label=?,institution=?,college=?,description=? WHERE id=?`,
+        )
+        .bind(
+          name,
+          yearLabel,
+          sectionLabel,
+          institution,
+          college,
+          description,
+          campusCourseId,
+        )
+        .run();
+      await audit(
+        db,
+        viewer.id,
+        'course_updated',
+        `Updated course details for ${name}`,
+      ).run();
+      return json({ ok: true });
+    }
     if (action === 'toggle_code') {
       const status = body.status === 'paused' ? 'paused' : 'active';
       await db.batch([
@@ -639,7 +679,8 @@ export async function POST(request: Request) {
     if (action === 'edit_subject') {
       const id = value(body.id),
         name = value(body.name),
-        code = value(body.code).toUpperCase();
+        code = value(body.code).toUpperCase(),
+        topic = value(body.topic);
       if (name.length < 2 || code.length < 2)
         return json(
           { error: 'Enter a subject name and code.' },
@@ -647,9 +688,9 @@ export async function POST(request: Request) {
         );
       await db
         .prepare(
-          `UPDATE subjects SET name=?,code=?,initials=? WHERE id=? AND course_id=?`,
+          `UPDATE subjects SET name=?,code=?,initials=?,next_topic=? WHERE id=? AND course_id=?`,
         )
-        .bind(name, code, initials(name), id, campusCourseId)
+        .bind(name, code, initials(name), topic, id, campusCourseId)
         .run();
       await audit(db, viewer.id, 'subject_updated', `Updated ${name}`).run();
       return json({ ok: true });
@@ -746,9 +787,18 @@ export async function POST(request: Request) {
         return json({ error: 'Enter valid event details.' }, { status: 400 });
       await db
         .prepare(
-          `UPDATE schedule_entries SET title=?,location=?,starts_at=?,ends_at=? WHERE id=? AND course_id=?`,
+          `UPDATE schedule_entries SET title=?,location=?,starts_at=?,ends_at=?,entry_type=?,notes=? WHERE id=? AND course_id=?`,
         )
-        .bind(title, location, startsAt, endsAt, id, campusCourseId)
+        .bind(
+          title,
+          location,
+          startsAt,
+          endsAt,
+          value(body.type) || 'class',
+          value(body.notes),
+          id,
+          campusCourseId,
+        )
         .run();
       return json({ ok: true });
     }
@@ -769,7 +819,7 @@ export async function POST(request: Request) {
         );
       await db
         .prepare(
-          `INSERT INTO rooms (id,name,room_type,capacity,availability,tone) VALUES (?,?,?,?,?,'available')`,
+          `INSERT INTO rooms (id,name,room_type,capacity,availability,tone,meeting_url) VALUES (?,?,?,?,?,'available',?)`,
         )
         .bind(
           crypto.randomUUID(),
@@ -777,6 +827,7 @@ export async function POST(request: Request) {
           value(body.type) || 'Physical room',
           capacity,
           value(body.availability) || 'Available now',
+          value(body.meetingUrl) || null,
         )
         .run();
       return json({ ok: true });
@@ -791,8 +842,17 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       await db
-        .prepare(`UPDATE rooms SET name=?,capacity=? WHERE id=?`)
-        .bind(name, capacity, id)
+        .prepare(
+          `UPDATE rooms SET name=?,capacity=?,room_type=?,availability=?,meeting_url=? WHERE id=?`,
+        )
+        .bind(
+          name,
+          capacity,
+          value(body.type) || 'Physical room',
+          value(body.availability) || 'Available now',
+          value(body.meetingUrl) || null,
+          id,
+        )
         .run();
       return json({ ok: true });
     }

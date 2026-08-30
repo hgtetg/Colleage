@@ -1,5 +1,7 @@
 'use client';
 
+/* oxlint-disable next/no-html-link-for-pages -- Native links avoid a Vinext production navigation crash. */
+
 import {
   BarChart3,
   Bell,
@@ -211,7 +213,6 @@ const fallbackPosts = [
 
 export default function CampusWorkspace() {
   const [dark, setDark] = useState(false);
-  const [arabic, setArabic] = useState(false);
   const [active, setActive] = useState('dashboard');
   const [activeSub, setActiveSub] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -225,6 +226,7 @@ export default function CampusWorkspace() {
   const [joinCode, setJoinCode] = useState('');
   const [postText, setPostText] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [courseMenuOpen, setCourseMenuOpen] = useState(false);
 
   const loadCampus = async () => {
     const response = await fetch('/api/campus', { cache: 'no-store' });
@@ -335,30 +337,18 @@ export default function CampusWorkspace() {
       setNotice('You have signed out.');
     } catch {}
   };
-  const addSubject = async () => {
-    const name = window.prompt('Subject name');
-    if (!name) return;
-    const code = window.prompt('Subject code');
-    if (!code) return;
-    try {
-      await mutate('add_subject', { name, code });
-      setNotice(`${name} was added.`);
-    } catch {}
-  };
+  const openEditor = (entity: string, query = '') =>
+    window.location.assign(`/app/manage/${entity}${query ? `?${query}` : ''}`);
+  const addSubject = () => openEditor('subject', 'mode=new');
   const editSubject = async (
     id: string,
     currentName: string,
     currentCode: string,
-  ) => {
-    const name = window.prompt('Subject name', currentName);
-    if (!name) return;
-    const code = window.prompt('Subject code', currentCode);
-    if (!code) return;
-    try {
-      await mutate('edit_subject', { id, name, code });
-      setNotice('Subject updated.');
-    } catch {}
-  };
+  ) =>
+    openEditor(
+      'subject',
+      `mode=edit&id=${encodeURIComponent(id)}&name=${encodeURIComponent(currentName)}&code=${encodeURIComponent(currentCode)}`,
+    );
   const deleteSubject = async (id: string, name: string) => {
     if (!window.confirm(`Remove ${name} and its lectures and materials?`))
       return;
@@ -367,56 +357,23 @@ export default function CampusWorkspace() {
       setNotice(`${name} was removed.`);
     } catch {}
   };
-  const addLecture = async (subjectId: string) => {
-    const title = window.prompt('Lecture title');
-    if (!title) return;
-    const summary = window.prompt('Short summary') ?? '';
-    try {
-      await mutate('add_lecture', { subjectId, title, summary });
-      setNotice('Lecture added.');
-    } catch {}
-  };
-  const addSchedule = async () => {
-    const title = window.prompt('Event title');
-    if (!title) return;
-    const location = window.prompt('Location');
-    if (!location) return;
-    const startsAt = window.prompt(
-      'Start date and time (example: 2026-09-05T10:00:00+03:00)',
+  const addLecture = (subjectId: string) =>
+    openEditor(
+      'lecture',
+      `mode=new&subjectId=${encodeURIComponent(subjectId)}`,
     );
-    if (!startsAt) return;
-    const endsAt = window.prompt(
-      'End date and time',
-      new Date(new Date(startsAt).getTime() + 3_600_000).toISOString(),
-    );
-    if (!endsAt) return;
-    try {
-      await mutate('add_schedule', { title, location, startsAt, endsAt });
-      setNotice('Schedule event added.');
-    } catch {}
-  };
+  const addSchedule = () => openEditor('schedule', 'mode=new');
   const editSchedule = async (
     id: string,
     title: string,
     location: string,
     startsAt: string,
     endsAt: string,
-  ) => {
-    const nextTitle = window.prompt('Event title', title);
-    if (!nextTitle) return;
-    const nextLocation = window.prompt('Location', location);
-    if (!nextLocation) return;
-    try {
-      await mutate('edit_schedule', {
-        id,
-        title: nextTitle,
-        location: nextLocation,
-        startsAt,
-        endsAt,
-      });
-      setNotice('Schedule updated.');
-    } catch {}
-  };
+  ) =>
+    openEditor(
+      'schedule',
+      `mode=edit&id=${encodeURIComponent(id)}&title=${encodeURIComponent(title)}&location=${encodeURIComponent(location)}&startsAt=${encodeURIComponent(startsAt)}&endsAt=${encodeURIComponent(endsAt)}`,
+    );
   const deleteSchedule = async (id: string, title: string) => {
     if (!window.confirm(`Remove ${title} from the schedule?`)) return;
     try {
@@ -424,31 +381,12 @@ export default function CampusWorkspace() {
       setNotice('Schedule event removed.');
     } catch {}
   };
-  const addRoom = async () => {
-    const name = window.prompt('Room name');
-    if (!name) return;
-    const capacity = Number(window.prompt('Capacity', '6'));
-    if (!capacity) return;
-    try {
-      await mutate('add_room', {
-        name,
-        capacity,
-        type: 'Physical room',
-        availability: 'Available now',
-      });
-      setNotice('Study room added.');
-    } catch {}
-  };
-  const editRoom = async (id: string, name: string, capacity: number) => {
-    const nextName = window.prompt('Room name', name);
-    if (!nextName) return;
-    const nextCapacity = Number(window.prompt('Capacity', String(capacity)));
-    if (!nextCapacity) return;
-    try {
-      await mutate('edit_room', { id, name: nextName, capacity: nextCapacity });
-      setNotice('Room updated.');
-    } catch {}
-  };
+  const addRoom = () => openEditor('room', 'mode=new');
+  const editRoom = (id: string, name: string, capacity: number) =>
+    openEditor(
+      'room',
+      `mode=edit&id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}&capacity=${capacity}`,
+    );
   const deleteRoom = async (id: string, name: string) => {
     if (!window.confirm(`Remove ${name}?`)) return;
     try {
@@ -463,14 +401,11 @@ export default function CampusWorkspace() {
       setNotice('Post removed.');
     } catch {}
   };
-  const editPost = async (id: string, text: string) => {
-    const next = window.prompt('Edit post', text);
-    if (!next || next === text) return;
-    try {
-      await mutate('edit_post', { postId: id, text: next });
-      setNotice('Post updated.');
-    } catch {}
-  };
+  const editPost = (id: string, text: string) =>
+    openEditor(
+      'post',
+      `mode=edit&id=${encodeURIComponent(id)}&text=${encodeURIComponent(text)}`,
+    );
   const pinPost = async (id: string) => {
     try {
       await mutate('toggle_pin', { postId: id });
@@ -553,10 +488,7 @@ export default function CampusWorkspace() {
     });
 
   return (
-    <div
-      className={dark ? 'campus-app dark' : 'campus-app'}
-      dir={arabic ? 'rtl' : 'ltr'}
-    >
+    <div className={dark ? 'campus-app dark' : 'campus-app'}>
       <header className="settings-bar">
         <button
           className="brand"
@@ -568,13 +500,6 @@ export default function CampusWorkspace() {
           <span>Campus Hub</span>
         </button>
         <div className="settings-actions">
-          <button
-            className="language-button"
-            type="button"
-            onClick={() => setArabic((value) => !value)}
-          >
-            {arabic ? 'AR' : 'EN'}
-          </button>
           <button
             type="button"
             onClick={() => setDark((value) => !value)}
@@ -623,7 +548,7 @@ export default function CampusWorkspace() {
 
       <nav className="main-nav" aria-label="Main navigation">
         <div className="nav-inner">
-          {navItems.map(({ key, label, arabic: arLabel, icon: Icon }) => (
+          {navItems.map(({ key, label, icon: Icon }) => (
             <button
               className={
                 active === key ? 'main-nav-item active' : 'main-nav-item'
@@ -633,29 +558,47 @@ export default function CampusWorkspace() {
               onClick={() => go(key)}
             >
               <Icon size={18} strokeWidth={1.8} />
-              <span>{arabic ? arLabel : label}</span>
+              <span>{label}</span>
             </button>
           ))}
         </div>
-        <button
-          className="course-switcher"
-          type="button"
-          onClick={() =>
-            setNotice(
-              'Software Engineering · Year 2 · Section A is your active course.',
-            )
-          }
-        >
-          <span className="course-dot">SE</span>
-          <span>
-            <strong>{campus?.course.name ?? 'Software Engineering'}</strong>
-            <small>
-              {campus?.course.yearLabel ?? 'Year 2'} ·{' '}
-              {campus?.course.sectionLabel ?? 'Section A'}
-            </small>
-          </span>
-          <ChevronDown size={15} />
-        </button>
+        <div className="course-switcher-wrap">
+          <button
+            className="course-switcher"
+            type="button"
+            aria-expanded={courseMenuOpen}
+            onClick={() => setCourseMenuOpen((value) => !value)}
+          >
+            <span className="course-dot">SE</span>
+            <span>
+              <strong>{campus?.course.name ?? 'Software Engineering'}</strong>
+              <small>
+                {campus?.course.yearLabel ?? 'Year 2'} ·{' '}
+                {campus?.course.sectionLabel ?? 'Section A'}
+              </small>
+            </span>
+            <ChevronDown size={15} />
+          </button>
+          {courseMenuOpen && (
+            <div className="course-switcher-menu">
+              <button type="button" onClick={() => setCourseMenuOpen(false)}>
+                <span className="course-dot">SE</span>
+                <span>
+                  <strong>{campus?.course.name}</strong>
+                  <small>Current course · {campus?.viewer?.role}</small>
+                </span>
+                <Check size={15} />
+              </button>
+              <a href="/app/courses">
+                <BookOpen size={17} />
+                <span>
+                  <strong>See all courses</strong>
+                  <small>Open your courses page</small>
+                </span>
+              </a>
+            </div>
+          )}
+        </div>
       </nav>
 
       <div className="sub-nav" role="tablist" aria-label="Page views">
@@ -696,7 +639,15 @@ export default function CampusWorkspace() {
         )}
         {active === 'dashboard' && (
           <Dashboard
-            onManage={() => (campus?.viewer ? go('subjects') : go('join'))}
+            view={activeSub}
+            posts={livePosts}
+            subjects={liveSubjects}
+            onManage={() =>
+              campus?.viewer?.role === 'representative' ||
+              campus?.viewer?.role === 'admin'
+                ? openEditor('course')
+                : go('subjects')
+            }
             onSchedule={() => go('schedule')}
             code={studentCode}
             viewer={campus?.viewer ?? null}
@@ -705,6 +656,7 @@ export default function CampusWorkspace() {
         )}
         {active === 'subjects' && (
           <Subjects
+            view={activeSub}
             subjects={liveSubjects}
             lectures={campus?.lectures ?? []}
             materials={campus?.materials ?? []}
@@ -721,6 +673,7 @@ export default function CampusWorkspace() {
         )}
         {active === 'schedule' && (
           <Schedule
+            view={activeSub}
             schedule={liveSchedule}
             canManage={
               campus?.viewer?.role === 'representative' ||
@@ -733,6 +686,7 @@ export default function CampusWorkspace() {
         )}
         {active === 'rooms' && (
           <Rooms
+            view={activeSub}
             rooms={liveRooms}
             onBook={bookRoom}
             signedIn={Boolean(campus?.viewer)}
@@ -749,6 +703,7 @@ export default function CampusWorkspace() {
         )}
         {active === 'community' && (
           <Community
+            view={activeSub}
             posts={livePosts}
             postText={postText}
             setPostText={setPostText}
@@ -766,15 +721,6 @@ export default function CampusWorkspace() {
             onDelete={deletePost}
             onEdit={editPost}
             onPin={pinPost}
-          />
-        )}
-        {active === 'manage' && (
-          <Dashboard
-            onManage={() => go('subjects')}
-            onSchedule={() => go('schedule')}
-            code={studentCode}
-            viewer={campus?.viewer ?? null}
-            schedule={liveSchedule}
           />
         )}
         {active === 'profile' && (
@@ -882,11 +828,11 @@ export default function CampusWorkspace() {
                 </button>
               )}
               {campus?.viewer?.role === 'representative' && (
-                <button type="button" onClick={() => go('subjects')}>
+                <button type="button" onClick={() => openEditor('course')}>
                   <BookOpen size={18} />
                   <span>
-                    <strong>Representative controls</strong>
-                    <small>Add, edit and remove directly on each page</small>
+                    <strong>Edit course</strong>
+                    <small>Course details and course content</small>
                   </span>
                 </button>
               )}
@@ -1014,13 +960,388 @@ function NotificationPanel({
   );
 }
 
+function WorkspaceSubView({
+  area,
+  view,
+  subjects = [],
+  materials = [],
+  schedule = [],
+  rooms = [],
+  posts = [],
+  people = [],
+  onBook,
+}: {
+  area: 'dashboard' | 'subjects' | 'schedule' | 'rooms' | 'community';
+  view: number;
+  subjects?: CampusState['subjects'];
+  materials?: CampusState['materials'];
+  schedule?: CampusState['schedule'];
+  rooms?: CampusState['rooms'];
+  posts?: CampusState['posts'];
+  people?: CampusState['members'];
+  onBook?: (id: string) => void;
+}) {
+  if (area === 'dashboard' && view === 1)
+    return (
+      <>
+        <PageTitle
+          eyebrow="MY PROGRESS"
+          title="Your learning progress"
+          description="Lecture completion and momentum across every active subject."
+        />
+        <div className="subpage-grid">
+          {subjects.map((subject) => (
+            <article className="ledger-card subpage-card" key={subject.id}>
+              <span className="subject-monogram teal">{subject.icon}</span>
+              <div>
+                <h2>{subject.name}</h2>
+                <p>
+                  {subject.code} · {subject.viewed} of {subject.lectures}{' '}
+                  lectures completed
+                </p>
+                <div className="progress">
+                  <span
+                    style={{
+                      width: `${subject.lectures ? Math.round((subject.viewed / subject.lectures) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <strong>
+                {subject.lectures
+                  ? Math.round((subject.viewed / subject.lectures) * 100)
+                  : 0}
+                %
+              </strong>
+            </article>
+          ))}
+        </div>
+      </>
+    );
+  if (area === 'dashboard')
+    return (
+      <>
+        <PageTitle
+          eyebrow="ANNOUNCEMENTS"
+          title="Course announcements"
+          description="Pinned notices and recent updates from your representative."
+        />
+        <div className="subpage-list">
+          {posts
+            .filter((post) => post.pinned)
+            .map((post) => (
+              <article
+                className="ledger-card announcement-list-card"
+                key={post.id}
+              >
+                <span>📌</span>
+                <div>
+                  <h2>{post.text}</h2>
+                  <p>
+                    {post.author} · {post.time}
+                  </p>
+                </div>
+              </article>
+            ))}
+          {!posts.some((post) => post.pinned) && (
+            <article className="ledger-card empty-inline">
+              <Bell />
+              <div>
+                <strong>No pinned announcements</strong>
+                <span>Important course notices will appear here.</span>
+              </div>
+            </article>
+          )}
+        </div>
+      </>
+    );
+  if (area === 'subjects' && view === 1)
+    return (
+      <>
+        <PageTitle
+          eyebrow="CURRENT SEMESTER"
+          title="Semester subjects"
+          description="All subjects grouped into your active Year 2 semester."
+        />
+        <section className="ledger-card semester-panel">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">SEMESTER 1</span>
+              <h2>{subjects.length} active subjects</h2>
+            </div>
+          </div>
+          {subjects.map((subject) => (
+            <div className="semester-row" key={subject.id}>
+              <span className="subject-monogram teal">{subject.icon}</span>
+              <div>
+                <strong>{subject.name}</strong>
+                <small>
+                  {subject.code} · Next: {subject.next}
+                </small>
+              </div>
+              <span>{subject.lectures} lectures</span>
+            </div>
+          ))}
+        </section>
+      </>
+    );
+  if (area === 'subjects')
+    return (
+      <>
+        <PageTitle
+          eyebrow="COURSE LIBRARY"
+          title="All course materials"
+          description="Open every file and reference shared across your subjects."
+        />
+        <section className="ledger-card materials-panel">
+          {materials.map((item) => (
+            <div className="material-row" key={item.id}>
+              <span>
+                <FileText size={18} />
+              </span>
+              <div>
+                <strong>{item.title}</strong>
+                <small>
+                  {
+                    subjects.find((subject) => subject.id === item.subjectId)
+                      ?.name
+                  }{' '}
+                  · {item.type}
+                </small>
+              </div>
+              {item.url ? (
+                <a
+                  className="material-open"
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open
+                </a>
+              ) : (
+                <span className="warning-pill">PROCESSING</span>
+              )}
+            </div>
+          ))}
+        </section>
+      </>
+    );
+  if (area === 'schedule' && view === 1)
+    return (
+      <>
+        <PageTitle
+          eyebrow="LIST VIEW"
+          title="Every scheduled item"
+          description="A chronological list of classes, exams, deadlines and study sessions."
+        />
+        <section className="ledger-card schedule-list-panel">
+          {schedule.map((item) => (
+            <article key={item.id}>
+              <span className="date-block">
+                <small>
+                  {new Date(item.startsAt)
+                    .toLocaleDateString('en', { month: 'short' })
+                    .toUpperCase()}
+                </small>
+                <strong>{new Date(item.startsAt).getDate()}</strong>
+              </span>
+              <div>
+                <h2>{item.title}</h2>
+                <p>
+                  {new Date(item.startsAt).toLocaleString()} · {item.location}
+                </p>
+              </div>
+              <span className="warning-pill">{item.type}</span>
+            </article>
+          ))}
+        </section>
+      </>
+    );
+  if (area === 'schedule') {
+    const deadlines = schedule.filter(
+      (item) => item.type === 'exam' || item.type === 'deadline',
+    );
+    return (
+      <>
+        <PageTitle
+          eyebrow="EXAMS & DEADLINES"
+          title="Important academic dates"
+          description="Assessment dates and submission deadlines that need your attention."
+        />
+        <div className="subpage-grid">
+          {deadlines.map((item) => (
+            <article className="ledger-card deadline-detail-card" key={item.id}>
+              <span className="warning-pill">{item.type}</span>
+              <h2>{item.title}</h2>
+              <p>
+                {new Date(item.startsAt).toLocaleString()} · {item.location}
+              </p>
+              <small>{item.notes || 'No additional instructions.'}</small>
+            </article>
+          ))}
+          {!deadlines.length && (
+            <article className="ledger-card empty-inline">
+              <CalendarDays />
+              <div>
+                <strong>No upcoming exams or deadlines</strong>
+                <span>New academic dates will appear here.</span>
+              </div>
+            </article>
+          )}
+        </div>
+      </>
+    );
+  }
+  if (area === 'rooms' && view === 1)
+    return (
+      <>
+        <PageTitle
+          eyebrow="BOOK A ROOM"
+          title="Choose your study space"
+          description="Select an available physical or online room."
+        />
+        <div className="subpage-grid">
+          {rooms.map((room) => (
+            <article className="ledger-card compact-room" key={room.id}>
+              <DoorOpen />
+              <div>
+                <h2>{room.name}</h2>
+                <p>
+                  {room.capacity} seats · {room.availability}
+                </p>
+              </div>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => onBook?.(room.id)}
+              >
+                {room.booked ? 'Cancel booking' : 'Book room'}
+              </button>
+            </article>
+          ))}
+        </div>
+      </>
+    );
+  if (area === 'rooms') {
+    const booked = rooms.filter((room) => room.booked);
+    return (
+      <>
+        <PageTitle
+          eyebrow="MY BOOKINGS"
+          title="Your reserved spaces"
+          description="Manage the study spaces you have already booked."
+        />
+        <div className="subpage-grid">
+          {booked.map((room) => (
+            <article className="ledger-card compact-room" key={room.id}>
+              <Check />
+              <div>
+                <h2>{room.name}</h2>
+                <p>{room.availability}</p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => onBook?.(room.id)}
+              >
+                Cancel
+              </button>
+            </article>
+          ))}
+          {!booked.length && (
+            <article className="ledger-card empty-inline">
+              <DoorOpen />
+              <div>
+                <strong>No active bookings</strong>
+                <span>Use Book a room to reserve a space.</span>
+              </div>
+            </article>
+          )}
+        </div>
+      </>
+    );
+  }
+  if (area === 'community' && view === 1)
+    return (
+      <>
+        <PageTitle
+          eyebrow="DISCUSSIONS"
+          title="Active course discussions"
+          description="Questions and study conversations from your classmates."
+        />
+        <div className="subpage-list">
+          {posts
+            .filter((post) => !post.pinned)
+            .map((post) => (
+              <article className="ledger-card discussion-card" key={post.id}>
+                <span className="avatar">{post.initials}</span>
+                <div>
+                  <h2>{post.text}</h2>
+                  <p>
+                    {post.author} · {post.replies} replies · {post.helpful}{' '}
+                    helpful
+                  </p>
+                </div>
+              </article>
+            ))}
+        </div>
+      </>
+    );
+  const representatives = people.filter((person) =>
+    person.role.toLowerCase().includes('representative'),
+  );
+  return (
+    <>
+      <PageTitle
+        eyebrow="COURSE GROUPS"
+        title="People and study groups"
+        description="Find your course leaders and the classmates learning with you."
+      />
+      <div className="subpage-grid">
+        <article className="ledger-card group-card">
+          <Users />
+          <h2>Section A students</h2>
+          <p>{people.length} verified members</p>
+          <div>
+            {people.slice(0, 5).map((person) => (
+              <span className="avatar" key={person.name}>
+                {person.initials}
+              </span>
+            ))}
+          </div>
+        </article>
+        <article className="ledger-card group-card">
+          <ShieldCheck />
+          <h2>Course representatives</h2>
+          <p>{representatives.length} course leader</p>
+          {representatives.map((person) => (
+            <div className="member-mini" key={person.name}>
+              <span className="avatar">{person.initials}</span>
+              <div>
+                <strong>{person.name}</strong>
+                <small>{person.role}</small>
+              </div>
+            </div>
+          ))}
+        </article>
+      </div>
+    </>
+  );
+}
+
 function Dashboard({
+  view,
+  posts,
+  subjects,
   onManage,
   onSchedule,
   code,
   viewer,
   schedule,
 }: {
+  view: number;
+  posts: CampusState['posts'];
+  subjects: CampusState['subjects'];
   onManage: () => void;
   onSchedule: () => void;
   code: string;
@@ -1037,6 +1358,15 @@ function Dashboard({
       tone: entry.tone,
     };
   });
+  if (view > 0)
+    return (
+      <WorkspaceSubView
+        area="dashboard"
+        view={view}
+        posts={posts}
+        subjects={subjects}
+      />
+    );
   return (
     <>
       <PageTitle
@@ -1176,6 +1506,7 @@ function Dashboard({
 }
 
 function Subjects({
+  view,
   subjects,
   lectures,
   materials,
@@ -1186,6 +1517,7 @@ function Subjects({
   onAddLecture,
   canManage,
 }: {
+  view: number;
   subjects: CampusState['subjects'];
   lectures: CampusState['lectures'];
   materials: CampusState['materials'];
@@ -1198,6 +1530,15 @@ function Subjects({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const subject = subjects.find((item) => item.id === selected);
+  if (view > 0)
+    return (
+      <WorkspaceSubView
+        area="subjects"
+        view={view}
+        subjects={subjects}
+        materials={materials}
+      />
+    );
   if (subject)
     return (
       <>
@@ -1426,12 +1767,14 @@ function Subjects({
 }
 
 function Schedule({
+  view,
   schedule,
   canManage,
   onAdd,
   onEdit,
   onDelete,
 }: {
+  view: number;
   schedule: CampusState['schedule'];
   canManage: boolean;
   onAdd: () => void;
@@ -1483,6 +1826,8 @@ function Schedule({
     link.click();
     URL.revokeObjectURL(url);
   };
+  if (view > 0)
+    return <WorkspaceSubView area="schedule" view={view} schedule={schedule} />;
   return (
     <>
       <PageTitle
@@ -1602,6 +1947,7 @@ function Schedule({
 }
 
 function Rooms({
+  view,
   rooms,
   onBook,
   signedIn,
@@ -1612,6 +1958,7 @@ function Rooms({
   onEdit,
   onDelete,
 }: {
+  view: number;
   rooms: CampusState['rooms'];
   onBook: (id: string) => void;
   signedIn: boolean;
@@ -1624,6 +1971,15 @@ function Rooms({
 }) {
   const [availableOnly, setAvailableOnly] = useState(false);
   const bookedRoom = rooms.find((room) => room.booked)?.id ?? null;
+  if (view > 0)
+    return (
+      <WorkspaceSubView
+        area="rooms"
+        view={view}
+        rooms={rooms}
+        onBook={onBook}
+      />
+    );
   return (
     <>
       <PageTitle
@@ -1760,6 +2116,7 @@ function Rooms({
 }
 
 function Community({
+  view,
   posts,
   postText,
   setPostText,
@@ -1775,6 +2132,7 @@ function Community({
   onEdit,
   onPin,
 }: {
+  view: number;
   posts: CampusState['posts'];
   postText: string;
   setPostText: (value: string) => void;
@@ -1791,6 +2149,15 @@ function Community({
   onPin: (id: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  if (view > 0)
+    return (
+      <WorkspaceSubView
+        area="community"
+        view={view}
+        posts={posts}
+        people={people}
+      />
+    );
   return (
     <>
       <PageTitle
