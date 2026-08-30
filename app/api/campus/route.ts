@@ -636,6 +636,65 @@ export async function POST(request: Request) {
         .run();
       return json({ ok: true });
     }
+    if (action === 'edit_subject') {
+      const id = value(body.id),
+        name = value(body.name),
+        code = value(body.code).toUpperCase();
+      if (name.length < 2 || code.length < 2)
+        return json(
+          { error: 'Enter a subject name and code.' },
+          { status: 400 },
+        );
+      await db
+        .prepare(
+          `UPDATE subjects SET name=?,code=?,initials=? WHERE id=? AND course_id=?`,
+        )
+        .bind(name, code, initials(name), id, campusCourseId)
+        .run();
+      await audit(db, viewer.id, 'subject_updated', `Updated ${name}`).run();
+      return json({ ok: true });
+    }
+    if (action === 'delete_subject') {
+      const id = value(body.id);
+      await db
+        .prepare(`DELETE FROM subjects WHERE id=? AND course_id=?`)
+        .bind(id, campusCourseId)
+        .run();
+      await audit(
+        db,
+        viewer.id,
+        'subject_removed',
+        `Removed subject ${id}`,
+      ).run();
+      return json({ ok: true });
+    }
+    if (action === 'add_lecture') {
+      const subjectId = value(body.subjectId),
+        title = value(body.title),
+        summary = value(body.summary);
+      if (title.length < 2)
+        return json({ error: 'Enter a lecture title.' }, { status: 400 });
+      const order = await db
+        .prepare(
+          `SELECT COALESCE(MAX(l.position),0)+1 next_position FROM lectures l JOIN subjects s ON s.id=l.subject_id WHERE l.subject_id=? AND s.course_id=?`,
+        )
+        .bind(subjectId, campusCourseId)
+        .first<{ next_position: number }>();
+      await db
+        .prepare(
+          `INSERT INTO lectures (id,subject_id,title,summary,position) SELECT ?,id,?,?,? FROM subjects WHERE id=? AND course_id=?`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          title,
+          summary,
+          order?.next_position ?? 1,
+          subjectId,
+          campusCourseId,
+        )
+        .run();
+      return json({ ok: true });
+    }
     if (action === 'add_schedule') {
       const title = value(body.title),
         location = value(body.location),
@@ -668,6 +727,112 @@ export async function POST(request: Request) {
           value(body.notes),
           viewer.id,
         )
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'edit_schedule') {
+      const id = value(body.id),
+        title = value(body.title),
+        location = value(body.location),
+        startsAt = value(body.startsAt),
+        endsAt = value(body.endsAt);
+      if (
+        title.length < 2 ||
+        location.length < 2 ||
+        !startsAt ||
+        !endsAt ||
+        new Date(endsAt) <= new Date(startsAt)
+      )
+        return json({ error: 'Enter valid event details.' }, { status: 400 });
+      await db
+        .prepare(
+          `UPDATE schedule_entries SET title=?,location=?,starts_at=?,ends_at=? WHERE id=? AND course_id=?`,
+        )
+        .bind(title, location, startsAt, endsAt, id, campusCourseId)
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'delete_schedule') {
+      await db
+        .prepare(`DELETE FROM schedule_entries WHERE id=? AND course_id=?`)
+        .bind(value(body.id), campusCourseId)
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'add_room') {
+      const name = value(body.name),
+        capacity = Math.round(Number(body.capacity));
+      if (name.length < 2 || !Number.isFinite(capacity) || capacity < 1)
+        return json(
+          { error: 'Enter a room name and capacity.' },
+          { status: 400 },
+        );
+      await db
+        .prepare(
+          `INSERT INTO rooms (id,name,room_type,capacity,availability,tone) VALUES (?,?,?,?,?,'available')`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          name,
+          value(body.type) || 'Physical room',
+          capacity,
+          value(body.availability) || 'Available now',
+        )
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'edit_room') {
+      const id = value(body.id),
+        name = value(body.name),
+        capacity = Math.round(Number(body.capacity));
+      if (name.length < 2 || !Number.isFinite(capacity) || capacity < 1)
+        return json(
+          { error: 'Enter a room name and capacity.' },
+          { status: 400 },
+        );
+      await db
+        .prepare(`UPDATE rooms SET name=?,capacity=? WHERE id=?`)
+        .bind(name, capacity, id)
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'delete_room') {
+      const id = value(body.id);
+      await db.batch([
+        db.prepare(`DELETE FROM bookings WHERE room_id=?`).bind(id),
+        db.prepare(`DELETE FROM rooms WHERE id=?`).bind(id),
+      ]);
+      return json({ ok: true });
+    }
+    if (action === 'edit_post') {
+      const postId = value(body.postId),
+        text = value(body.text);
+      if (text.length < 2 || text.length > 1500)
+        return json(
+          { error: 'Posts must be between 2 and 1,500 characters.' },
+          { status: 400 },
+        );
+      await db
+        .prepare(
+          `UPDATE posts SET body=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND course_id=?`,
+        )
+        .bind(text, postId, campusCourseId)
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'delete_post') {
+      await db
+        .prepare(`DELETE FROM posts WHERE id=? AND course_id=?`)
+        .bind(value(body.postId), campusCourseId)
+        .run();
+      return json({ ok: true });
+    }
+    if (action === 'toggle_pin') {
+      await db
+        .prepare(
+          `UPDATE posts SET pinned=CASE pinned WHEN 1 THEN 0 ELSE 1 END,updated_at=CURRENT_TIMESTAMP WHERE id=? AND course_id=?`,
+        )
+        .bind(value(body.postId), campusCourseId)
         .run();
       return json({ ok: true });
     }
