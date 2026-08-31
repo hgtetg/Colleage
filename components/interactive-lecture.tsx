@@ -151,7 +151,7 @@ export default function InteractiveLecture() {
       const response = await fetch('/api/campus', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'complete_lecture', lectureId: lecture.id }),
+        body: JSON.stringify({ action: 'complete_lecture', lectureId }),
       });
       const result = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(result.error || 'Unable to update your progress.');

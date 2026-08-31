@@ -20,6 +20,7 @@ import {
   Sparkles,
   UploadCloud,
 } from 'lucide-react';
+import { zipSync } from 'fflate';
 import { useEffect, useMemo, useState } from 'react';
 import AcademicShell from '@/components/academic-shell';
 import type { CampusState } from '@/lib/campus-db';
@@ -102,19 +103,20 @@ function safeJson(response: Response) {
   return response.json() as Promise<Record<string, unknown>>;
 }
 
-function lectureJsonContract(subject: CampusState['subjects'][number]) {
+function lectureJsonContract() {
   return {
     schemaVersion: 'campus-hub-lecture/v1',
     contractNote: 'Replace every bracketed value. Return this completed object as valid JSON only; do not add prose or Markdown.',
     imageLocationReference: {
+      pdf: 'Use the rendered page path media/page-001.jpg through media/page-024.jpg. The number is the original PDF page number.',
       powerpoint: 'Use the exact embedded-image path, for example ppt/media/image1.png.',
       word: 'Use the exact embedded-image path, for example word/media/image1.jpeg.',
       directImage: 'Use the exact uploaded filename, for example concept-map.png.',
       rule: 'Never invent a location or use a web URL. Every image location must exist in the attached lecture source.',
     },
     lecture: {
-      title: `[Clear ${subject.name} lecture title]`,
-      summary: '[One concise summary of what students will learn.]',
+      title: '[Clear lecture title derived from the attached source]',
+      summary: '[One concise summary derived from the attached source.]',
       estimatedMinutes: 18,
     },
     sections: [
@@ -156,6 +158,45 @@ function lectureJsonContract(subject: CampusState['subjects'][number]) {
       },
     ],
   };
+}
+
+async function renderPdfAsImageArchive(file: File) {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  const pdfDocument = await loadingTask.promise;
+  const pages: Record<string, Uint8Array> = {};
+
+  try {
+    const pageCount = Math.min(pdfDocument.numPages, 24);
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const naturalViewport = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: Math.min(2, 1440 / naturalViewport.width) });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) throw new Error('Your browser could not prepare the PDF pages.');
+      await page.render({ canvas, canvasContext: context, viewport }).promise;
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (value) => value ? resolve(value) : reject(new Error('A PDF page could not be converted into an image.')),
+          'image/jpeg',
+          0.86,
+        );
+      });
+      pages[`media/page-${String(pageNumber).padStart(3, '0')}.jpg`] = new Uint8Array(await blob.arrayBuffer());
+      page.cleanup();
+    }
+  } finally {
+    await loadingTask.destroy();
+  }
+
+  const archive = zipSync(pages, { level: 6 });
+  const bytes = archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength) as ArrayBuffer;
+  const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-z0-9._-]+/gi, '-');
+  return new File([bytes], `${baseName || 'lecture'}-pdf-pages.zip`, { type: 'application/zip' });
 }
 
 export default function AiAgentLectureBuilder({ step }: { step: BuilderStep }) {
@@ -245,7 +286,7 @@ export default function AiAgentLectureBuilder({ step }: { step: BuilderStep }) {
             onDraft={setDraft}
           />
         )}
-        {step === 'files' && <FilesStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
+        {step === 'files' && <FilesStep basePath={basePath} draft={draft} onDraft={setDraft} />}
         {step === 'design' && <DesignStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
         {step === 'images' && <ImagesStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
       </section>
@@ -310,7 +351,7 @@ function AgentStep({
   const [error, setError] = useState('');
   const selected = agents.find((item) => item.id === agent) ?? agents[0];
   const prompt = useMemo(
-    () => `Create an accurate university lecture for ${subject.name} (${subject.code}). I attached the lecture source and the Campus Hub JSON contract. Read both files. Your entire response must be one valid raw JSON object: the first character must be { and the last character must be }. Do not write any explanation, greeting, summary, Markdown, code fence, or text before or after the JSON. Preserve the exact schemaVersion and all field names from the contract; do not add remote URLs or binary image data. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. The location must be the exact embedded image path from the source: for PowerPoint use paths like ppt/media/image1.png; for Word use word/media/image1.png; for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
+    () => `Create an accurate university lecture from the attached lecture source and complete the attached Campus Hub JSON contract. The Campus Hub subject ${subject.name} (${subject.code}) is only the publishing destination; it is not a required lecture topic and must not override the source. Determine the actual subject, lecture title, summary, terminology, and sections entirely from the attached source. If the source topic differs from the Campus Hub publishing destination, use the source topic without refusing, asking a question, explaining the mismatch, or inventing unrelated content. Your entire response must be one valid raw JSON object: the first character must be { and the last character must be }. Do not write any explanation, greeting, warning, summary, Markdown, code fence, or text before or after the JSON. Preserve the exact schemaVersion and all required field names from the contract; do not add remote URLs or binary image data. Replace all bracketed placeholders and remove contractNote and imageLocationReference from the completed output. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. For a PDF, Campus Hub renders the first 24 pages and the exact locations are media/page-001.jpg, media/page-002.jpg, and so on; use the three-digit original PDF page number that contains the relevant visual. For PowerPoint use paths like ppt/media/image1.png, for Word use word/media/image1.png, and for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
     [subject.code, subject.name],
   );
 
@@ -325,13 +366,13 @@ function AgentStep({
   }
 
   function downloadContract() {
-    const blob = new Blob([JSON.stringify(lectureJsonContract(subject), null, 2)], {
+    const blob = new Blob([JSON.stringify(lectureJsonContract(), null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${subject.code.toLowerCase()}-campus-hub-lecture-contract.json`;
+    link.download = 'campus-hub-lecture-contract.json';
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 500);
   }
@@ -362,6 +403,7 @@ function AgentStep({
         <span className="agent-eyebrow"><Bot size={16} /> Step 1 · Choose your AI agent</span>
         <h2>One prompt, your preferred workspace.</h2>
         <p>Download the JSON contract, then give it to your chosen agent together with the lecture source and the prompt below.</p>
+        <p><strong>Your uploaded source decides the lecture topic.</strong> {subject.name} is only where Campus Hub will publish the finished lecture.</p>
       </div>
       <div className="agent-toggle" role="radiogroup" aria-label="Choose your AI agent">
         {agents.map((item) => (
@@ -418,12 +460,10 @@ function AgentStep({
 }
 
 function FilesStep({
-  subject,
   basePath,
   draft,
   onDraft,
 }: {
-  subject: CampusState['subjects'][number];
   basePath: string;
   draft: Draft | null;
   onDraft: (draft: Draft) => void;
@@ -470,10 +510,13 @@ function FilesStep({
     setBusy(true);
     setError('');
     try {
+      const sourceFile = lectureFile.type === 'application/pdf' || lectureFile.name.toLowerCase().endsWith('.pdf')
+        ? await renderPdfAsImageArchive(lectureFile)
+        : lectureFile;
       const form = new FormData();
       form.append('action', 'upload');
       form.append('draftId', draft.id);
-      form.append('lectureFile', lectureFile);
+      form.append('lectureFile', sourceFile);
       form.append('agentFile', agentFile);
       const response = await fetch('/api/lecture-builder', { method: 'POST', body: form });
       const result = await safeJson(response);
@@ -499,11 +542,11 @@ function FilesStep({
           icon={FileText}
           eyebrow="SOURCE FILE"
           title="Your lecture file"
-          text="Use PPTX, DOCX, ZIP, or one image file. These formats let Campus Hub extract the real source images."
+          text="Use PDF, PPTX, DOCX, ZIP, or one image. PDF pages are converted privately in your browser into selectable source images."
           file={lectureFile}
           savedName={draft?.lectureFileName}
           onChange={setLectureFile}
-          accept=".pptx,.docx,.zip,.png,.jpg,.jpeg,.webp,.gif"
+          accept=".pdf,application/pdf,.pptx,.docx,.zip,.png,.jpg,.jpeg,.webp,.gif"
         />
         <FilePicker
           icon={FileArchive}
