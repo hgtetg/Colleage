@@ -26,6 +26,22 @@ export async function GET(request: Request) {
           )
           .bind(viewer.id, key, key)
           .first(),
+      ) ||
+      Boolean(
+        await db
+          .prepare(
+            `SELECT d.id FROM lecture_drafts d JOIN json_each(d.image_manifest) image WHERE d.created_by=? AND json_extract(image.value,'$.objectKey')=? LIMIT 1`,
+          )
+          .bind(viewer.id, key)
+          .first(),
+      ) ||
+      Boolean(
+        await db
+          .prepare(
+            `SELECT a.id FROM lecture_assets a JOIN lectures l ON l.id=a.lecture_id JOIN subjects s ON s.id=l.subject_id JOIN memberships m ON m.course_id=s.course_id WHERE a.object_key=? AND m.user_id=?`,
+          )
+          .bind(key, viewer.id)
+          .first(),
       );
     if (!key || !allowed) return new Response('Not found', { status: 404 });
     const object = await getEnv().FILES.get(key);

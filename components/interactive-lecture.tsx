@@ -22,7 +22,15 @@ import type { CampusState } from '@/lib/campus-db';
 type LessonSection = {
   title: string;
   body: string;
-  image: number;
+  image:
+    | number
+    | {
+        title: string;
+        caption: string;
+        sourceLocation: string;
+        alt?: string;
+        url?: string | null;
+      };
   keyPoint?: string;
 };
 
@@ -61,7 +69,12 @@ function lessonSections(
     .map((item, index) => ({
       title: item.title,
       body: item.body,
-      image: Number.isInteger(item.image) && item.image >= 0 && item.image <= 8 ? item.image : index,
+      image:
+        Number.isInteger(item.image) && Number(item.image) >= 0 && Number(item.image) <= 8
+          ? Number(item.image)
+          : typeof item.image === 'object' && item.image
+            ? item.image
+            : index,
       keyPoint: item.keyPoint,
     }));
   return sections?.length ? sections : fallbackSections(subjectName, nextTopic, summary);
@@ -130,6 +143,8 @@ export default function InteractiveLecture() {
 
   const design = ['atelier', 'midnight', 'citrus'].includes(lecture.design) ? lecture.design : 'atelier';
   const current = sections[activeSection] ?? sections[0];
+  const sourceImage = typeof current.image === 'object' ? current.image : null;
+  const imageStyle = sourceImage?.url ? { backgroundImage: `url("${sourceImage.url}")` } : undefined;
   async function toggleCompletion() {
     setSaving(true);
     try {
@@ -157,7 +172,7 @@ export default function InteractiveLecture() {
             <span className="lecture-reader-kicker"><Sparkles size={15} /> {subject.code} · Interactive lesson</span>
             <h1>{lecture.content?.title || lecture.title}</h1>
             <p>{lecture.content?.subtitle || lecture.summary}</p>
-            <div className="lecture-reader-meta"><span><Clock3 size={15} /> {Math.max(8, sections.length * 4)} min read</span><span><Compass size={15} /> {sections.length} learning moments</span></div>
+            <div className="lecture-reader-meta"><span><Clock3 size={15} /> {lecture.content?.estimatedMinutes ?? Math.max(8, sections.length * 4)} min read</span><span><Compass size={15} /> {sections.length} learning moments</span></div>
           </div>
           <button className={completed ? 'reader-complete completed' : 'reader-complete'} type="button" onClick={toggleCompletion} disabled={saving}>
             {saving ? <LoaderCircle className="spin" size={18} /> : completed ? <CheckCircle2 size={18} /> : <Circle size={18} />}
@@ -174,7 +189,16 @@ export default function InteractiveLecture() {
             ))}
           </nav>
           <article className="lecture-reader-card">
-            <div className={`lecture-reader-image image-tile-${current.image}`} aria-hidden="true"><span>Campus Hub · visual explanation</span></div>
+            <figure className={sourceImage ? 'lecture-reader-figure source-lecture-figure' : 'lecture-reader-figure'}>
+              <div
+                className={sourceImage ? 'lecture-reader-image source-lecture-image' : `lecture-reader-image image-tile-${current.image}`}
+                style={imageStyle}
+                role={sourceImage ? 'img' : undefined}
+                aria-label={sourceImage?.alt || sourceImage?.title}
+                aria-hidden={sourceImage ? undefined : true}
+              ><span>{sourceImage?.title || 'Campus Hub · visual explanation'}</span></div>
+              {sourceImage && <figcaption><strong>{sourceImage.title}</strong><span>{sourceImage.caption}</span></figcaption>}
+            </figure>
             <div className="lecture-reader-section">
               <span>PART {String(activeSection + 1).padStart(2, '0')}</span>
               <h2>{current.title}</h2>

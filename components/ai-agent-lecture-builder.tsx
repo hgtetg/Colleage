@@ -9,6 +9,7 @@ import {
   Check,
   CheckCircle2,
   Clipboard,
+  Download,
   ExternalLink,
   FileArchive,
   FileText,
@@ -23,6 +24,24 @@ import AcademicShell from '@/components/academic-shell';
 import type { CampusState } from '@/lib/campus-db';
 
 type BuilderStep = 'agent' | 'files' | 'design' | 'images';
+type SourceImage = {
+  sourceLocation: string;
+  fileName: string;
+  contentType: string;
+  url: string;
+};
+type LessonSection = {
+  id: string;
+  title: string;
+  body: string;
+  keyPoint?: string;
+  image: { title: string; caption: string; location: string; alt: string };
+};
+type LessonContract = {
+  schemaVersion: 'campus-hub-lecture/v1';
+  lecture: { title: string; summary: string; estimatedMinutes: number };
+  sections: LessonSection[];
+};
 type Draft = {
   id: string;
   subjectId: string;
@@ -30,7 +49,9 @@ type Draft = {
   lectureFileName: string | null;
   agentFileName: string | null;
   design: string;
-  imageChoices: number[];
+  imageManifest: SourceImage[];
+  lesson: LessonContract | null;
+  imageSelections: Record<string, string>;
   status: string;
 };
 
@@ -76,15 +97,64 @@ const designs = [
   },
 ];
 
-const imageGroups = [
-  { title: 'Concept opener', choices: [0, 1, 2] },
-  { title: 'How it works', choices: [3, 4, 5] },
-  { title: 'Pattern in practice', choices: [6, 7, 8] },
-  { title: 'Key takeaway', choices: [0, 4, 8] },
-];
-
 function safeJson(response: Response) {
   return response.json() as Promise<Record<string, unknown>>;
+}
+
+function lectureJsonContract(subject: CampusState['subjects'][number]) {
+  return {
+    schemaVersion: 'campus-hub-lecture/v1',
+    contractNote: 'Replace every bracketed value. Return this completed object as valid JSON only; do not add prose or Markdown.',
+    imageLocationReference: {
+      powerpoint: 'Use the exact embedded-image path, for example ppt/media/image1.png.',
+      word: 'Use the exact embedded-image path, for example word/media/image1.jpeg.',
+      directImage: 'Use the exact uploaded filename, for example concept-map.png.',
+      rule: 'Never invent a location or use a web URL. Every image location must exist in the attached lecture source.',
+    },
+    lecture: {
+      title: `[Clear ${subject.name} lecture title]`,
+      summary: '[One concise summary of what students will learn.]',
+      estimatedMinutes: 18,
+    },
+    sections: [
+      {
+        id: 'foundation',
+        title: '[First learning moment]',
+        body: '[Explain the key concept using only the attached source.]',
+        keyPoint: '[One memorable takeaway.]',
+        image: {
+          title: '[Image title]',
+          caption: '[What this source image shows and why it matters.]',
+          location: 'ppt/media/image1.png',
+          alt: '[Short accessible description of the image.]',
+        },
+      },
+      {
+        id: 'worked-example',
+        title: '[Second learning moment]',
+        body: '[Explain a worked example from the attached source.]',
+        keyPoint: '[One memorable takeaway.]',
+        image: {
+          title: '[Image title]',
+          caption: '[What this source image shows and why it matters.]',
+          location: 'ppt/media/image2.png',
+          alt: '[Short accessible description of the image.]',
+        },
+      },
+      {
+        id: 'application',
+        title: '[Third learning moment]',
+        body: '[Give a practical application or comparison.]',
+        keyPoint: '[One memorable takeaway.]',
+        image: {
+          title: '[Image title]',
+          caption: '[What this source image shows and why it matters.]',
+          location: 'ppt/media/image3.png',
+          alt: '[Short accessible description of the image.]',
+        },
+      },
+    ],
+  };
 }
 
 export default function AiAgentLectureBuilder({ step }: { step: BuilderStep }) {
@@ -239,7 +309,7 @@ function AgentStep({
   const [error, setError] = useState('');
   const selected = agents.find((item) => item.id === agent) ?? agents[0];
   const prompt = useMemo(
-    () => `You are helping create an accurate university lecture for ${subject.name} (${subject.code}). Read the attached source file. Return valid JSON only in this shape: {"title":"...","summary":"...","sections":[{"title":"...","body":"...","keyPoint":"..."}]}. Create 4–6 concise sections, explain terms plainly, include one worked example, highlight practical trade-offs, and end with a short application task. Do not invent facts that are not supported by the source.`,
+    () => `Create an accurate university lecture for ${subject.name} (${subject.code}). I attached the lecture source and the Campus Hub JSON contract. Read both files. Return one completed JSON file only: preserve the exact schemaVersion and all field names from the contract; do not add prose, Markdown, remote URLs, or binary image data. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. The location must be the exact embedded image path from the source: for PowerPoint use paths like ppt/media/image1.png; for Word use word/media/image1.png; for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
     [subject.code, subject.name],
   );
 
@@ -251,6 +321,18 @@ function AgentStep({
     } catch {
       setError('Copy was blocked by the browser. Select the prompt and copy it manually.');
     }
+  }
+
+  function downloadContract() {
+    const blob = new Blob([JSON.stringify(lectureJsonContract(subject), null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${subject.code.toLowerCase()}-campus-hub-lecture-contract.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 500);
   }
 
   async function continueToFiles() {
@@ -278,7 +360,7 @@ function AgentStep({
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><Bot size={16} /> Step 1 · Choose your AI agent</span>
         <h2>One prompt, your preferred workspace.</h2>
-        <p>Select where you want to create the lesson outline. The next steps bring the finished output back into Campus Hub.</p>
+        <p>Download the JSON contract, then give it to your chosen agent together with the lecture source and the prompt below.</p>
       </div>
       <div className="agent-toggle" role="radiogroup" aria-label="Choose your AI agent">
         {agents.map((item) => (
@@ -306,16 +388,21 @@ function AgentStep({
         </div>
         <div className="prompt-box">
           <p>{prompt}</p>
-          <button type="button" onClick={copyPrompt}>
-            {copied ? <Check size={16} /> : <Clipboard size={16} />}
-            {copied ? 'Prompt copied' : 'Copy prompt'}
-          </button>
+          <div className="prompt-actions">
+            <button type="button" onClick={downloadContract}>
+              <Download size={16} /> Download JSON contract
+            </button>
+            <button type="button" onClick={copyPrompt}>
+              {copied ? <Check size={16} /> : <Clipboard size={16} />}
+              {copied ? 'Prompt copied' : 'Copy prompt'}
+            </button>
+          </div>
         </div>
         <ol className="agent-task-list">
-          <li><span>1</span><div><strong>Copy the prompt</strong><p>Use the copy button above to keep the request complete.</p></div></li>
-          <li><span>2</span><div><strong>Paste it with your lecture file</strong><p>Open <a href={selected.url} target="_blank" rel="noreferrer">{selected.name} <ExternalLink size={13} /></a>, attach the source file, then send the prompt.</p></div></li>
-          <li><span>3</span><div><strong>Download the agent output</strong><p>Save the result as JSON, TXT, or Markdown when possible.</p></div></li>
-          <li><span>4</span><div><strong>Upload both files in the next step</strong><p>Campus Hub securely stores your source and the generated output with this lecture draft.</p></div></li>
+          <li><span>1</span><div><strong>Download the JSON contract</strong><p>It is the exact lecture-web-page structure the agent must complete.</p></div></li>
+          <li><span>2</span><div><strong>Attach all three inputs</strong><p>Open <a href={selected.url} target="_blank" rel="noreferrer">{selected.name} <ExternalLink size={13} /></a>, then attach your lecture source, the downloaded contract, and the copied prompt.</p></div></li>
+          <li><span>3</span><div><strong>Download one completed JSON file</strong><p>Do not accept prose, a PDF, or Markdown. The completed contract must stay a JSON file.</p></div></li>
+          <li><span>4</span><div><strong>Upload source + JSON here</strong><p>Campus Hub matches each JSON image location to the real image extracted from the lecture source.</p></div></li>
         </ol>
       </div>
       {error && <p className="agent-form-error">{error}</p>}
@@ -383,32 +470,32 @@ function FilesStep({
     <div className="agent-builder-card files-step">
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><UploadCloud size={16} /> Step 2 · Bring the source back</span>
-        <h2>Upload the two files that power the lesson.</h2>
-        <p>They remain private to your course draft. Each file can be up to 20 MB.</p>
+        <h2>Upload the source and its completed JSON contract.</h2>
+        <p>Campus Hub extracts the source images, validates every image location in the JSON, and keeps both files private to this draft.</p>
       </div>
       <div className="upload-grid">
         <FilePicker
           icon={FileText}
           eyebrow="SOURCE FILE"
           title="Your lecture file"
-          text="The slides, notes, PDF, or document you gave the agent."
+          text="Use PPTX, DOCX, ZIP, or one image file. These formats let Campus Hub extract the real source images."
           file={lectureFile}
           savedName={draft?.lectureFileName}
           onChange={setLectureFile}
-          accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md"
+          accept=".pptx,.docx,.zip,.png,.jpg,.jpeg,.webp,.gif"
         />
         <FilePicker
           icon={FileArchive}
           eyebrow="AGENT OUTPUT"
           title="Your AI-agent output"
-          text="Prefer the JSON, TXT, or Markdown file generated from the prompt."
+          text="The one completed .json file the AI agent returned from the Campus Hub contract."
           file={agentFile}
           savedName={draft?.agentFileName}
           onChange={setAgentFile}
-          accept=".json,.txt,.md,.pdf,.doc,.docx"
+          accept=".json,application/json"
         />
       </div>
-      <div className="upload-assurance"><CheckCircle2 size={17} /> Files are attached to this draft only and are never shown in the public lecture.</div>
+      <div className="upload-assurance"><CheckCircle2 size={17} /> Original files remain private. Only the image titles, captions, and selected extracted images appear in the published lecture.</div>
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">
         <a className="portal-secondary" href={basePath}><ArrowLeft size={16} /> Back</a>
@@ -531,19 +618,25 @@ function ImagesStep({
   draft: Draft | null;
   onDraft: (draft: Draft) => void;
 }) {
-  const initial = imageGroups.map((group, index) => draft?.imageChoices[index] ?? group.choices[0]);
-  const [selected, setSelected] = useState(initial);
+  const sections = draft?.lesson?.sections ?? [];
+  const [selected, setSelected] = useState<Record<string, string>>(
+    () => Object.fromEntries(sections.map((section) => [section.id, draft?.imageSelections[section.id] ?? section.image.location])),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function createLecture() {
     if (!draft) return setError('Choose a design before creating the lecture.');
+    if (!sections.length || !draft.imageManifest.length) {
+      setError('Upload a completed JSON contract and a source file with embedded images first.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
       const imagesResponse = await fetch('/api/lecture-builder', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'update_images', draftId: draft.id, imageChoices: selected }),
+        body: JSON.stringify({ action: 'update_images', draftId: draft.id, imageSelections: selected }),
       });
       const imagesResult = await safeJson(imagesResponse);
       if (!imagesResponse.ok) throw new Error(String(imagesResult.error || 'Unable to save the image choices.'));
@@ -566,29 +659,34 @@ function ImagesStep({
     <div className="agent-builder-card images-step">
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><ImagePlus size={16} /> Step 4 · Shape the visual story</span>
-        <h2>Choose one image for each moment.</h2>
-        <p>Swipe through each image strip and pick the image that best supports the section. These visuals will appear in the finished lecture.</p>
+        <h2>Confirm the real source image for every section.</h2>
+        <p>The title and caption come directly from your AI-agent JSON. Campus Hub has extracted the images from your uploaded lecture source; keep the matched one or select another extracted image.</p>
       </div>
-      <div className="image-selection-list">
-        {imageGroups.map((group, groupIndex) => (
-          <section className="image-selection-group" key={group.title}>
-            <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><h3>{group.title}</h3><small>Swipe to compare →</small></div>
-            <div className="image-slider" aria-label={`Select an image for ${group.title}`}>
-              {group.choices.map((image) => (
-                <button
-                  type="button"
-                  className={`image-choice image-tile-${image}${selected[groupIndex] === image ? ' selected' : ''}`}
-                  key={image}
-                  onClick={() => setSelected((current) => current.map((item, index) => index === groupIndex ? image : item))}
-                  aria-pressed={selected[groupIndex] === image}
-                >
-                  <span>{selected[groupIndex] === image ? <Check size={16} /> : 'Select'}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+      {sections.length ? (
+        <div className="image-selection-list">
+          {sections.map((section, groupIndex) => (
+            <section className="image-selection-group source-image-group" key={section.id}>
+              <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><div><h3>{section.image.title}</h3><p>{section.image.caption}</p></div><small>Source: {section.image.location}</small></div>
+              <div className="image-slider" aria-label={`Select the image for ${section.image.title}`}>
+                {draft!.imageManifest.map((image) => (
+                  <button
+                    type="button"
+                    className={selected[section.id] === image.sourceLocation ? 'source-image-choice selected' : 'source-image-choice'}
+                    key={image.sourceLocation}
+                    onClick={() => setSelected((current) => ({ ...current, [section.id]: image.sourceLocation }))}
+                    aria-pressed={selected[section.id] === image.sourceLocation}
+                  >
+                    <img src={image.url} alt="" />
+                    <span>{selected[section.id] === image.sourceLocation ? <><Check size={15} /> Selected source image</> : image.sourceLocation}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="contract-empty"><FileArchive size={20} /><div><strong>Your JSON contract is not ready yet.</strong><p>Go back and upload the original lecture source plus the completed JSON file from your AI agent.</p></div></div>
+      )}
       <div className="creation-note"><Sparkles size={17} /><span>Ready to create: {subject.name} will be published as a responsive, interactive lecture.</span></div>
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">

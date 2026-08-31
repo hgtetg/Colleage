@@ -54,10 +54,20 @@ export type CampusState = {
     content: {
       title?: string;
       subtitle?: string;
+      estimatedMinutes?: number;
       sections?: Array<{
+        id?: string;
         title: string;
         body: string;
-        image: number;
+        image:
+          | number
+          | {
+              title: string;
+              caption: string;
+              sourceLocation: string;
+              alt?: string;
+              url?: string | null;
+            };
         keyPoint?: string;
       }>;
     } | null;
