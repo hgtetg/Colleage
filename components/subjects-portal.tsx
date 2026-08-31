@@ -270,7 +270,7 @@ function SubjectDetail({
                     ? 'lecture-link-card selected'
                     : 'lecture-link-card'
                 }
-                href={`/app/subjects/${encodeURIComponent(subject.id)}?lecture=${encodeURIComponent(lecture.id)}#selected-lecture`}
+                href={`/app/subjects/${encodeURIComponent(subject.id)}/lectures/${encodeURIComponent(lecture.id)}`}
                 key={lecture.id}
               >
                 <span className="lecture-number">
@@ -392,7 +392,11 @@ function LectureMethodPage({
                 ? 'lecture-method-card recommended'
                 : 'lecture-method-card'
             }
-            href={`/app/subjects/${encodeURIComponent(subject.id)}/add-lecture?method=${key}`}
+            href={
+              key === 'ai-agents'
+                ? `/app/subjects/${encodeURIComponent(subject.id)}/add-lecture/ai-agents`
+                : `/app/subjects/${encodeURIComponent(subject.id)}/add-lecture?method=${key}`
+            }
             key={key}
           >
             {recommended && (
