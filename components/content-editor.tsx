@@ -514,7 +514,7 @@ function CourseContent({ state }: { state: CampusState }) {
                 Edit
               </a>
               <a
-                href={`/app/manage/lecture?mode=new&subjectId=${encodeURIComponent(subject.id)}`}
+                href={`/app/subjects/${encodeURIComponent(subject.id)}/add-lecture`}
               >
                 Add lecture
               </a>

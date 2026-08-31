@@ -241,6 +241,21 @@ export default function CampusWorkspace() {
   };
 
   useEffect(() => {
+    const requestedView = new URLSearchParams(window.location.search).get(
+      'view',
+    );
+    if (
+      requestedView &&
+      [
+        'dashboard',
+        'schedule',
+        'rooms',
+        'community',
+        'profile',
+        'settings',
+      ].includes(requestedView)
+    )
+      queueMicrotask(() => setActive(requestedView));
     void (async () => {
       try {
         await loadCampus();
@@ -293,6 +308,10 @@ export default function CampusWorkspace() {
     }
     if (key === 'join') {
       window.location.assign('/signup');
+      return;
+    }
+    if (key === 'subjects') {
+      window.location.assign('/app/subjects');
       return;
     }
     setActive(key);
@@ -358,9 +377,8 @@ export default function CampusWorkspace() {
     } catch {}
   };
   const addLecture = (subjectId: string) =>
-    openEditor(
-      'lecture',
-      `mode=new&subjectId=${encodeURIComponent(subjectId)}`,
+    window.location.assign(
+      `/app/subjects/${encodeURIComponent(subjectId)}/add-lecture`,
     );
   const addSchedule = () => openEditor('schedule', 'mode=new');
   const editSchedule = async (
