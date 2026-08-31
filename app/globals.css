@@ -6853,6 +6853,13 @@ body {
 .creation-note { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #4a7166; font-size: 12px; }
 .upload-assurance svg,
 .creation-note svg { color: #0b8b7d; }
+.json-paste-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 13px 18px; align-items: end; margin-top: 18px; padding: 18px; border: 1px solid #d4e2d9; border-radius: 16px; background: #f1f8f3; }
+.json-paste-option > div > span { display: inline-flex; align-items: center; gap: 7px; color: #1f5f54; font-size: 13px; font-weight: 900; }
+.json-paste-option > div > p { margin: 5px 0 0; color: #668077; font-size: 12px; line-height: 1.5; }
+.json-paste-option code { padding: 1px 4px; border-radius: 4px; background: #dcefe4; color: #0c7266; font-size: 11px; }
+.json-paste-option textarea { grid-column: 1 / -1; min-height: 112px; width: 100%; resize: vertical; padding: 12px; border: 1px solid #bed3c7; border-radius: 11px; background: #fff; color: #294640; font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.json-paste-option textarea:focus { outline: 2px solid #8fcabb; outline-offset: 2px; }
+.json-paste-option > button { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; justify-content: center; }
 .design-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 32px; }
 .design-option { position: relative; min-height: 300px; display: flex; flex-direction: column; padding: 12px; border: 1px solid #d5ddd4; border-radius: 18px; background: #fbfcfa; color: inherit; cursor: pointer; overflow: hidden; text-align: left; transition: 180ms ease; }
 .design-option:hover { transform: translateY(-3px); box-shadow: 0 13px 25px rgba(31, 62, 55, 0.09); }
@@ -7002,6 +7009,8 @@ body {
   .agent-builder-actions .portal-primary,
   .agent-builder-actions .portal-secondary { width: 100%; justify-content: center; }
   .file-picker { min-height: 220px; }
+  .json-paste-option { grid-template-columns: 1fr; }
+  .json-paste-option > button { width: 100%; }
   .image-selection-group { padding: 15px; }
   .image-choice { flex-basis: 78%; }
   .source-image-choice { flex-basis: 78%; }

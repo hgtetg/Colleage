@@ -12,6 +12,7 @@ import {
   Download,
   ExternalLink,
   FileArchive,
+  FileJson,
   FileText,
   ImagePlus,
   LoaderCircle,
@@ -309,7 +310,7 @@ function AgentStep({
   const [error, setError] = useState('');
   const selected = agents.find((item) => item.id === agent) ?? agents[0];
   const prompt = useMemo(
-    () => `Create an accurate university lecture for ${subject.name} (${subject.code}). I attached the lecture source and the Campus Hub JSON contract. Read both files. Return one completed JSON file only: preserve the exact schemaVersion and all field names from the contract; do not add prose, Markdown, remote URLs, or binary image data. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. The location must be the exact embedded image path from the source: for PowerPoint use paths like ppt/media/image1.png; for Word use word/media/image1.png; for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
+    () => `Create an accurate university lecture for ${subject.name} (${subject.code}). I attached the lecture source and the Campus Hub JSON contract. Read both files. Your entire response must be one valid raw JSON object: the first character must be { and the last character must be }. Do not write any explanation, greeting, summary, Markdown, code fence, or text before or after the JSON. Preserve the exact schemaVersion and all field names from the contract; do not add remote URLs or binary image data. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. The location must be the exact embedded image path from the source: for PowerPoint use paths like ppt/media/image1.png; for Word use word/media/image1.png; for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
     [subject.code, subject.name],
   );
 
@@ -401,7 +402,7 @@ function AgentStep({
         <ol className="agent-task-list">
           <li><span>1</span><div><strong>Download the JSON contract</strong><p>It is the exact lecture-web-page structure the agent must complete.</p></div></li>
           <li><span>2</span><div><strong>Attach all three inputs</strong><p>Open <a href={selected.url} target="_blank" rel="noreferrer">{selected.name} <ExternalLink size={13} /></a>, then attach your lecture source, the downloaded contract, and the copied prompt.</p></div></li>
-          <li><span>3</span><div><strong>Download one completed JSON file</strong><p>Do not accept prose, a PDF, or Markdown. The completed contract must stay a JSON file.</p></div></li>
+          <li><span>3</span><div><strong>Get raw JSON only</strong><p>The response must begin with {`{`} and end with {`}`}. Download it as a .json file, or paste it into Campus Hub on the next step.</p></div></li>
           <li><span>4</span><div><strong>Upload source + JSON here</strong><p>Campus Hub matches each JSON image location to the real image extracted from the lecture source.</p></div></li>
         </ol>
       </div>
@@ -429,9 +430,29 @@ function FilesStep({
 }) {
   const [lectureFile, setLectureFile] = useState<File | null>(null);
   const [agentFile, setAgentFile] = useState<File | null>(null);
+  const [pastedJson, setPastedJson] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const ready = Boolean(draft?.lectureFileName && draft?.agentFileName);
+
+  function usePastedJson() {
+    const raw = pastedJson
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '');
+    try {
+      const parsed = JSON.parse(raw);
+      const file = new File(
+        [JSON.stringify(parsed, null, 2)],
+        'campus-hub-ai-output.json',
+        { type: 'application/json' },
+      );
+      setAgentFile(file);
+      setError('');
+    } catch {
+      setError('Paste one complete JSON object from the AI agent before using it.');
+    }
+  }
 
   async function saveFiles() {
     if (!draft) {
@@ -494,6 +515,21 @@ function FilesStep({
           onChange={setAgentFile}
           accept=".json,application/json"
         />
+      </div>
+      <div className="json-paste-option">
+        <div>
+          <span><FileJson size={17} /> Claude gave you text instead of a file?</span>
+          <p>Paste the raw JSON response here. Campus Hub will turn it into the required <code>.json</code> output file automatically.</p>
+        </div>
+        <textarea
+          value={pastedJson}
+          onChange={(event) => setPastedJson(event.target.value)}
+          placeholder={'{\n  "schemaVersion": "campus-hub-lecture/v1",\n  ...\n}'}
+          aria-label="Paste the AI agent JSON response"
+        />
+        <button className="portal-secondary" type="button" onClick={usePastedJson} disabled={!pastedJson.trim()}>
+          <FileJson size={16} /> Use pasted JSON
+        </button>
       </div>
       <div className="upload-assurance"><CheckCircle2 size={17} /> Original files remain private. Only the image titles, captions, and selected extracted images appear in the published lecture.</div>
       {error && <p className="agent-form-error">{error}</p>}
