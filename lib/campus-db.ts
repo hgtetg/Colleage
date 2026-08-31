@@ -50,6 +50,17 @@ export type CampusState = {
     summary: string;
     position: number;
     completed: boolean;
+    design: string;
+    content: {
+      title?: string;
+      subtitle?: string;
+      sections?: Array<{
+        title: string;
+        body: string;
+        image: number;
+        keyPoint?: string;
+      }>;
+    } | null;
   }>;
   materials: Array<{
     id: string;
@@ -148,6 +159,18 @@ export function getEnv() {
 }
 export function getDb() {
   return getEnv().DB;
+}
+
+function parseLectureContent(value: unknown): CampusState['lectures'][number]['content'] {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as CampusState['lectures'][number]['content'])
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getViewer(
@@ -269,7 +292,7 @@ export async function readCampusState(
       .all<Record<string, string | number>>(),
     db
       .prepare(
-        `SELECT l.id,l.subject_id,l.title,l.summary,l.position,CASE WHEN p.lecture_id IS NULL THEN 0 ELSE 1 END completed FROM lectures l JOIN subjects s ON s.id=l.subject_id LEFT JOIN lecture_progress p ON p.lecture_id=l.id AND p.user_id=? WHERE s.course_id=? AND l.published=1 ORDER BY l.subject_id,l.position`,
+        `SELECT l.id,l.subject_id,l.title,l.summary,l.position,l.design,l.content_json,CASE WHEN p.lecture_id IS NULL THEN 0 ELSE 1 END completed FROM lectures l JOIN subjects s ON s.id=l.subject_id LEFT JOIN lecture_progress p ON p.lecture_id=l.id AND p.user_id=? WHERE s.course_id=? AND l.published=1 ORDER BY l.subject_id,l.position`,
       )
       .bind(viewerId, campusCourseId)
       .all<Record<string, string | number>>(),
@@ -342,6 +365,8 @@ export async function readCampusState(
       summary: String(r.summary),
       position: Number(r.position),
       completed: Boolean(r.completed),
+      design: String(r.design ?? 'atelier'),
+      content: parseLectureContent(r.content_json),
     })),
     materials: materials.results.map((r) => ({
       id: String(r.id),

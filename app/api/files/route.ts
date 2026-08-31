@@ -18,6 +18,14 @@ export async function GET(request: Request) {
           )
           .bind(key, viewer.id)
           .first(),
+      ) ||
+      Boolean(
+        await db
+          .prepare(
+            `SELECT id FROM lecture_drafts WHERE created_by=? AND (lecture_file_key=? OR agent_file_key=?)`,
+          )
+          .bind(viewer.id, key, key)
+          .first(),
       );
     if (!key || !allowed) return new Response('Not found', { status: 404 });
     const object = await getEnv().FILES.get(key);
