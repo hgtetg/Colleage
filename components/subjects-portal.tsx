@@ -216,8 +216,6 @@ function SubjectDetail({
   const selectedLecture = lectures.find(
     (item) => item.id === selectedLectureId,
   );
-  const canManage =
-    state.viewer?.role === 'representative' || state.viewer?.role === 'admin';
   return (
     <section className="subjects-portal subject-detail-portal">
       <a className="portal-back" href="/app/subjects">
@@ -244,14 +242,12 @@ function SubjectDetail({
               <h2>Lecture library</h2>
               <p>Open a lecture card to view its summary and learning link.</p>
             </div>
-            {canManage && (
-              <a
-                className="portal-primary"
-                href={`/app/subjects/${encodeURIComponent(subject.id)}/add-lecture`}
-              >
-                <Plus size={17} /> Add lecture
-              </a>
-            )}
+            <a
+              className="portal-primary"
+              href={`/app/subjects/${encodeURIComponent(subject.id)}/add-lecture`}
+            >
+              <Plus size={17} /> Add lecture
+            </a>
           </div>
           {selectedLecture && (
             <article className="selected-lecture-panel" id="selected-lecture">
@@ -331,15 +327,6 @@ function LectureMethodPage({
 }) {
   const canManage =
     state.viewer?.role === 'representative' || state.viewer?.role === 'admin';
-  if (!canManage)
-    return (
-      <section className="portal-state">
-        <GraduationCap size={30} />
-        <h1>Representative access required</h1>
-        <p>Only course representatives can create lectures.</p>
-        <a href={`/app/subjects/${subject.id}`}>Return to subject</a>
-      </section>
-    );
   const methods = [
     {
       key: 'website-ai',
@@ -380,8 +367,9 @@ function LectureMethodPage({
         <span className="portal-kicker">NEW LECTURE · {subject.code}</span>
         <h1>How do you want to build this lecture?</h1>
         <p>
-          Choose a creation workflow. You can return here and select another
-          method at any time.
+          {canManage
+            ? 'Choose a creation workflow. You can return here and select another method at any time.'
+            : 'Explore the available creation workflows. Publishing remains limited to course representatives.'}
         </p>
       </div>
       {selected && (
@@ -425,7 +413,10 @@ function LectureMethodPage({
       </div>
       <div className="lecture-method-footnote">
         <CircleGauge size={17} />
-        <span>No lecture is published until you review and approve it.</span>
+        <span>
+          No lecture is published until a representative reviews and approves
+          it.
+        </span>
       </div>
     </section>
   );
