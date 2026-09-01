@@ -24,6 +24,7 @@ import { zipSync } from 'fflate';
 import { useEffect, useMemo, useState } from 'react';
 import AcademicShell from '@/components/academic-shell';
 import type { CampusState } from '@/lib/campus-db';
+import { getLectureImages, type LessonContract } from '@/lib/lecture-contract';
 
 type BuilderStep = 'agent' | 'files' | 'design' | 'images';
 type SourceImage = {
@@ -31,18 +32,6 @@ type SourceImage = {
   fileName: string;
   contentType: string;
   url: string;
-};
-type LessonSection = {
-  id: string;
-  title: string;
-  body: string;
-  keyPoint?: string;
-  image: { title: string; caption: string; location: string; alt: string };
-};
-type LessonContract = {
-  schemaVersion: 'campus-hub-lecture/v1';
-  lecture: { title: string; summary: string; estimatedMinutes: number };
-  sections: LessonSection[];
 };
 type Draft = {
   id: string;
@@ -105,8 +94,8 @@ function safeJson(response: Response) {
 
 function lectureJsonContract() {
   return {
-    schemaVersion: 'campus-hub-lecture/v1',
-    contractNote: 'Replace every bracketed value. Return this completed object as valid JSON only; do not add prose or Markdown.',
+    _instructions: 'Delete this key and imageLocationReference in the final output. Replace every bracketed value with source-derived content. Optional fields may be omitted. Content type must be paragraph, list, quote, code, image, table, formula, example, or definition.',
+    schemaVersion: 'campus-hub-lecture/v2',
     imageLocationReference: {
       pdf: 'Use the rendered page path media/page-001.jpg through media/page-024.jpg. The number is the original PDF page number.',
       powerpoint: 'Use the exact embedded-image path, for example ppt/media/image1.png.',
@@ -114,49 +103,44 @@ function lectureJsonContract() {
       directImage: 'Use the exact uploaded filename, for example concept-map.png.',
       rule: 'Never invent a location or use a web URL. Every image location must exist in the attached lecture source.',
     },
-    lecture: {
-      title: '[Clear lecture title derived from the attached source]',
-      summary: '[One concise summary derived from the attached source.]',
-      estimatedMinutes: 18,
+    meta: {
+      title: '[Lecture title derived from the source]',
+      subtitle: '[One-line subtitle, optional]',
+      course: '[Course or module, optional]',
+      instructor: '[Instructor, optional]',
+      date: '[Lecture date, optional]',
+      duration_minutes: 60,
     },
+    objectives: ['[What the learner will understand or be able to do]'],
+    toc_label: 'Contents',
     sections: [
       {
-        id: 'foundation',
-        title: '[First learning moment]',
-        body: '[Explain the key concept using only the attached source.]',
-        keyPoint: '[One memorable takeaway.]',
-        image: {
-          title: '[Image title]',
-          caption: '[What this source image shows and why it matters.]',
-          location: 'ppt/media/image1.png',
-          alt: '[Short accessible description of the image.]',
-        },
-      },
-      {
-        id: 'worked-example',
-        title: '[Second learning moment]',
-        body: '[Explain a worked example from the attached source.]',
-        keyPoint: '[One memorable takeaway.]',
-        image: {
-          title: '[Image title]',
-          caption: '[What this source image shows and why it matters.]',
-          location: 'ppt/media/image2.png',
-          alt: '[Short accessible description of the image.]',
-        },
-      },
-      {
-        id: 'application',
-        title: '[Third learning moment]',
-        body: '[Give a practical application or comparison.]',
-        keyPoint: '[One memorable takeaway.]',
-        image: {
-          title: '[Image title]',
-          caption: '[What this source image shows and why it matters.]',
-          location: 'ppt/media/image3.png',
-          alt: '[Short accessible description of the image.]',
-        },
+        id: 'short-section-id',
+        heading: '[Section heading]',
+        intro: '[Optional section introduction]',
+        content: [
+          { type: 'paragraph', text: '[Body text]' },
+          { type: 'list', style: 'bulleted', items: ['[Point one]', '[Point two]'] },
+          { type: 'quote', text: '[Quoted line]', attribution: '[Source, optional]' },
+          { type: 'code', language: '[Language, optional]', code: '[Exact code]' },
+          { type: 'image', src: 'media/page-001.jpg', alt: '[Accessible description]', caption: '[Image caption, optional]' },
+          { type: 'table', headers: ['[Column A]', '[Column B]'], rows: [['[Cell A]', '[Cell B]']] },
+          { type: 'formula', text: '[Formula]', note: '[Explanation, optional]' },
+          { type: 'example', title: '[Example title, optional]', text: '[Worked example]' },
+          { type: 'definition', term: '[Term]', text: '[Definition]' },
+        ],
+        key_points: ['[Short recap point]'],
+        subsections: [{
+          id: 'short-subsection-id',
+          heading: '[Subsection heading]',
+          content: [{ type: 'paragraph', text: '[Subsection content]' }],
+          key_points: ['[Optional subsection recap]'],
+        }],
       },
     ],
+    key_terms: [{ term: '[Important term]', definition: '[Definition]' }],
+    summary: ['[Closing summary paragraph]'],
+    further_reading: [{ title: '[Source-referenced resource]', url: 'https://example.com' }],
   };
 }
 
@@ -288,7 +272,7 @@ export default function AiAgentLectureBuilder({ step }: { step: BuilderStep }) {
         )}
         {step === 'files' && <FilesStep basePath={basePath} draft={draft} onDraft={setDraft} />}
         {step === 'design' && <DesignStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
-        {step === 'images' && <ImagesStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
+        {step === 'images' && <ImagesStep key={draft?.id ?? 'empty'} subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
       </section>
     </AcademicShell>
   );
@@ -351,7 +335,7 @@ function AgentStep({
   const [error, setError] = useState('');
   const selected = agents.find((item) => item.id === agent) ?? agents[0];
   const prompt = useMemo(
-    () => `Create an accurate university lecture from the attached lecture source and complete the attached Campus Hub JSON contract. The Campus Hub subject ${subject.name} (${subject.code}) is only the publishing destination; it is not a required lecture topic and must not override the source. Determine the actual subject, lecture title, summary, terminology, and sections entirely from the attached source. If the source topic differs from the Campus Hub publishing destination, use the source topic without refusing, asking a question, explaining the mismatch, or inventing unrelated content. Your entire response must be one valid raw JSON object: the first character must be { and the last character must be }. Do not write any explanation, greeting, warning, summary, Markdown, code fence, or text before or after the JSON. Preserve the exact schemaVersion and all required field names from the contract; do not add remote URLs or binary image data. Replace all bracketed placeholders and remove contractNote and imageLocationReference from the completed output. Create 3–8 concise sections with a clear explanation, a key point, and one important source image each. For every image, fill title, caption, alt, and location. For a PDF, Campus Hub renders the first 24 pages and the exact locations are media/page-001.jpg, media/page-002.jpg, and so on; use the three-digit original PDF page number that contains the relevant visual. For PowerPoint use paths like ppt/media/image1.png, for Word use word/media/image1.png, and for a direct image use its exact filename. Never invent an image location. Use only facts supported by the source.`,
+    () => `Read the entire attached lecture source and complete the attached Campus Hub v2 JSON schema. The Campus Hub subject ${subject.name} (${subject.code}) is only the publishing destination; it must never override the source topic. Determine the actual title, course, terminology, objectives, sections, subsections, glossary, summary, and metadata from the source. Preserve every meaningful concept, explanation, definition, example, quote, formula, code sample, table, data point, and important image; reorganize logically and merge repetition without losing information. Use only the nine content types defined in the schema and remove _instructions, imageLocationReference, and all placeholder examples from the final object. Do not invent facts, citations, links, or image paths. For a PDF, use media/page-001.jpg through media/page-024.jpg with the three-digit original page number. For PowerPoint use exact ppt/media paths, for Word use exact word/media paths, and for a direct image use its exact filename. Every image block needs src, alt, and a useful caption. Before finishing, compare the JSON against the source page by page and add anything omitted. Your entire response must be exactly one valid raw JSON object whose first character is { and last character is }. Do not create or return a ZIP, HTML template, schema file, Markdown file, sample, explanation, warning, greeting, code fence, or any text outside the completed JSON. If the source topic differs from ${subject.name}, build the lecture from the source anyway without refusing or asking a question.`,
     [subject.code, subject.name],
   );
 
@@ -372,7 +356,7 @@ function AgentStep({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'campus-hub-lecture-contract.json';
+    link.download = 'campus-hub-lecture-schema-v2.json';
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 500);
   }
@@ -402,7 +386,7 @@ function AgentStep({
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><Bot size={16} /> Step 1 · Choose your AI agent</span>
         <h2>One prompt, your preferred workspace.</h2>
-        <p>Download the JSON contract, then give it to your chosen agent together with the lecture source and the prompt below.</p>
+        <p>Download the v2 JSON schema, then give it to your chosen agent together with the lecture source and the prompt below.</p>
         <p><strong>Your uploaded source decides the lecture topic.</strong> {subject.name} is only where Campus Hub will publish the finished lecture.</p>
       </div>
       <div className="agent-toggle" role="radiogroup" aria-label="Choose your AI agent">
@@ -433,7 +417,7 @@ function AgentStep({
           <p>{prompt}</p>
           <div className="prompt-actions">
             <button type="button" onClick={downloadContract}>
-              <Download size={16} /> Download JSON contract
+              <Download size={16} /> Download v2 JSON schema
             </button>
             <button type="button" onClick={copyPrompt}>
               {copied ? <Check size={16} /> : <Clipboard size={16} />}
@@ -442,7 +426,7 @@ function AgentStep({
           </div>
         </div>
         <ol className="agent-task-list">
-          <li><span>1</span><div><strong>Download the JSON contract</strong><p>It is the exact lecture-web-page structure the agent must complete.</p></div></li>
+          <li><span>1</span><div><strong>Download the v2 JSON schema</strong><p>It defines objectives, nine content types, subsections, glossary, summary, and further reading.</p></div></li>
           <li><span>2</span><div><strong>Attach all three inputs</strong><p>Open <a href={selected.url} target="_blank" rel="noreferrer">{selected.name} <ExternalLink size={13} /></a>, then attach your lecture source, the downloaded contract, and the copied prompt.</p></div></li>
           <li><span>3</span><div><strong>Get raw JSON only</strong><p>The response must begin with {`{`} and end with {`}`}. Download it as a .json file, or paste it into Campus Hub on the next step.</p></div></li>
           <li><span>4</span><div><strong>Upload source + JSON here</strong><p>Campus Hub matches each JSON image location to the real image extracted from the lecture source.</p></div></li>
@@ -534,7 +518,7 @@ function FilesStep({
     <div className="agent-builder-card files-step">
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><UploadCloud size={16} /> Step 2 · Bring the source back</span>
-        <h2>Upload the source and its completed JSON contract.</h2>
+        <h2>Upload the source and its completed v2 JSON.</h2>
         <p>Campus Hub extracts the source images, validates every image location in the JSON, and keeps both files private to this draft.</p>
       </div>
       <div className="upload-grid">
@@ -567,7 +551,7 @@ function FilesStep({
         <textarea
           value={pastedJson}
           onChange={(event) => setPastedJson(event.target.value)}
-          placeholder={'{\n  "schemaVersion": "campus-hub-lecture/v1",\n  ...\n}'}
+          placeholder={'{\n  "schemaVersion": "campus-hub-lecture/v2",\n  "meta": { ... },\n  "sections": [ ... ]\n}'}
           aria-label="Paste the AI agent JSON response"
         />
         <button className="portal-secondary" type="button" onClick={usePastedJson} disabled={!pastedJson.trim()}>
@@ -697,15 +681,15 @@ function ImagesStep({
   draft: Draft | null;
   onDraft: (draft: Draft) => void;
 }) {
-  const sections = draft?.lesson?.sections ?? [];
+  const images = getLectureImages(draft?.lesson);
   const [selected, setSelected] = useState<Record<string, string>>(
-    () => Object.fromEntries(sections.map((section) => [section.id, draft?.imageSelections[section.id] ?? section.image.location])),
+    () => Object.fromEntries(images.map((image) => [image.key, draft?.imageSelections[image.key] ?? image.location])),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function createLecture() {
     if (!draft) return setError('Choose a design before creating the lecture.');
-    if (!sections.length || !draft.imageManifest.length) {
+    if (!draft.lesson || (images.length > 0 && !draft.imageManifest.length)) {
       setError('Upload a completed JSON contract and a source file with embedded images first.');
       return;
     }
@@ -741,28 +725,30 @@ function ImagesStep({
         <h2>Confirm the real source image for every section.</h2>
         <p>The title and caption come directly from your AI-agent JSON. Campus Hub has extracted the images from your uploaded lecture source; keep the matched one or select another extracted image.</p>
       </div>
-      {sections.length ? (
+      {images.length ? (
         <div className="image-selection-list">
-          {sections.map((section, groupIndex) => (
-            <section className="image-selection-group source-image-group" key={section.id}>
-              <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><div><h3>{section.image.title}</h3><p>{section.image.caption}</p></div><small>Source: {section.image.location}</small></div>
-              <div className="image-slider" aria-label={`Select the image for ${section.image.title}`}>
+          {images.map((imageReference, groupIndex) => (
+            <section className="image-selection-group source-image-group" key={imageReference.key}>
+              <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><div><h3>{imageReference.title}</h3><p>{imageReference.caption}</p></div><small>Source: {imageReference.location}</small></div>
+              <div className="image-slider" aria-label={`Select the image for ${imageReference.title}`}>
                 {draft!.imageManifest.map((image) => (
                   <button
                     type="button"
-                    className={selected[section.id] === image.sourceLocation ? 'source-image-choice selected' : 'source-image-choice'}
+                    className={selected[imageReference.key] === image.sourceLocation ? 'source-image-choice selected' : 'source-image-choice'}
                     key={image.sourceLocation}
-                    onClick={() => setSelected((current) => ({ ...current, [section.id]: image.sourceLocation }))}
-                    aria-pressed={selected[section.id] === image.sourceLocation}
+                    onClick={() => setSelected((current) => ({ ...current, [imageReference.key]: image.sourceLocation }))}
+                    aria-pressed={selected[imageReference.key] === image.sourceLocation}
                   >
                     <img src={image.url} alt="" />
-                    <span>{selected[section.id] === image.sourceLocation ? <><Check size={15} /> Selected source image</> : image.sourceLocation}</span>
+                    <span>{selected[imageReference.key] === image.sourceLocation ? <><Check size={15} /> Selected source image</> : image.sourceLocation}</span>
                   </button>
                 ))}
               </div>
             </section>
           ))}
         </div>
+      ) : draft?.lesson ? (
+        <div className="contract-empty"><CheckCircle2 size={20} /><div><strong>This lecture does not require source images.</strong><p>You can create the complete text, table, formula, code, glossary, and summary experience now.</p></div></div>
       ) : (
         <div className="contract-empty"><FileArchive size={20} /><div><strong>Your JSON contract is not ready yet.</strong><p>Go back and upload the original lecture source plus the completed JSON file from your AI agent.</p></div></div>
       )}

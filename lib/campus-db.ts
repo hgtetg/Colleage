@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { readCookie, sha256 } from '@/lib/auth';
+import type { PublishedLectureContent } from '@/lib/lecture-contract';
 
 export const campusCourseId = 'software-engineering-y2-a';
 
@@ -51,26 +52,7 @@ export type CampusState = {
     position: number;
     completed: boolean;
     design: string;
-    content: {
-      title?: string;
-      subtitle?: string;
-      estimatedMinutes?: number;
-      sections?: Array<{
-        id?: string;
-        title: string;
-        body: string;
-        image:
-          | number
-          | {
-              title: string;
-              caption: string;
-              sourceLocation: string;
-              alt?: string;
-              url?: string | null;
-            };
-        keyPoint?: string;
-      }>;
-    } | null;
+    content: PublishedLectureContent | null;
   }>;
   materials: Array<{
     id: string;
