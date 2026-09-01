@@ -263,7 +263,7 @@ function RichBlockView({ block }: { block: LectureBlock }) {
     <figure className="rich-block rich-image">
       {/* oxlint-disable-next-line next/no-img-element -- R2 images use authenticated dynamic URLs. */}
       <img src={block.src} alt={block.alt} />
-      {block.caption && <figcaption>{block.caption}</figcaption>}
+      {(block.title || block.caption) && <figcaption>{block.title && <strong>{block.title}</strong>}{block.caption && <span>{block.caption}</span>}</figcaption>}
     </figure>
   );
   if (block.type === 'table') return (

@@ -15,8 +15,10 @@ import {
   FileJson,
   FileText,
   ImagePlus,
+  KeyRound,
   LoaderCircle,
   Palette,
+  Search,
   Sparkles,
   UploadCloud,
 } from 'lucide-react';
@@ -26,12 +28,15 @@ import AcademicShell from '@/components/academic-shell';
 import type { CampusState } from '@/lib/campus-db';
 import { getLectureImages, type LessonContract } from '@/lib/lecture-contract';
 
-type BuilderStep = 'agent' | 'files' | 'design' | 'images';
+type BuilderStep = 'agent' | 'files' | 'images' | 'design';
 type SourceImage = {
   sourceLocation: string;
   fileName: string;
   contentType: string;
   url: string;
+  origin?: 'source' | 'google';
+  referenceKey?: string;
+  searchSuggestions?: string;
 };
 type Draft = {
   id: string;
@@ -97,7 +102,7 @@ function lectureJsonContract() {
     _instructions: 'Delete this key and imageLocationReference in the final output. Replace every bracketed value with source-derived content. Optional fields may be omitted. Content type must be paragraph, list, quote, code, image, table, formula, example, or definition.',
     schemaVersion: 'campus-hub-lecture/v2',
     imageLocationReference: {
-      pdf: 'Use the rendered page path media/page-001.jpg through media/page-024.jpg. The number is the original PDF page number.',
+      pdf: 'Use the rendered page path media/page-001.jpg through the final source page, up to media/page-060.jpg. The number is the original PDF page number.',
       powerpoint: 'Use the exact embedded-image path, for example ppt/media/image1.png.',
       word: 'Use the exact embedded-image path, for example word/media/image1.jpeg.',
       directImage: 'Use the exact uploaded filename, for example concept-map.png.',
@@ -123,7 +128,7 @@ function lectureJsonContract() {
           { type: 'list', style: 'bulleted', items: ['[Point one]', '[Point two]'] },
           { type: 'quote', text: '[Quoted line]', attribution: '[Source, optional]' },
           { type: 'code', language: '[Language, optional]', code: '[Exact code]' },
-          { type: 'image', src: 'media/page-001.jpg', alt: '[Accessible description]', caption: '[Image caption, optional]' },
+          { type: 'image', src: 'media/page-001.jpg', title: '[Image title]', alt: '[Accessible description]', caption: '[Image caption, optional]' },
           { type: 'table', headers: ['[Column A]', '[Column B]'], rows: [['[Cell A]', '[Cell B]']] },
           { type: 'formula', text: '[Formula]', note: '[Explanation, optional]' },
           { type: 'example', title: '[Example title, optional]', text: '[Worked example]' },
@@ -152,11 +157,11 @@ async function renderPdfAsImageArchive(file: File) {
   const pages: Record<string, Uint8Array> = {};
 
   try {
-    const pageCount = Math.min(pdfDocument.numPages, 24);
+    const pageCount = Math.min(pdfDocument.numPages, 60);
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
       const page = await pdfDocument.getPage(pageNumber);
       const naturalViewport = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({ scale: Math.min(2, 1440 / naturalViewport.width) });
+      const viewport = page.getViewport({ scale: Math.min(2, 1200 / naturalViewport.width) });
       const canvas = document.createElement('canvas');
       canvas.width = Math.ceil(viewport.width);
       canvas.height = Math.ceil(viewport.height);
@@ -167,7 +172,7 @@ async function renderPdfAsImageArchive(file: File) {
         canvas.toBlob(
           (value) => value ? resolve(value) : reject(new Error('A PDF page could not be converted into an image.')),
           'image/jpeg',
-          0.86,
+          0.8,
         );
       });
       pages[`media/page-${String(pageNumber).padStart(3, '0')}.jpg`] = new Uint8Array(await blob.arrayBuffer());
@@ -266,13 +271,20 @@ export default function AiAgentLectureBuilder({ step }: { step: BuilderStep }) {
           <AgentStep
             subject={subject}
             basePath={basePath}
-            initialAgent={draft?.agent ?? 'chatgpt'}
+            initialAgent={draft?.agent ?? ''}
             onDraft={setDraft}
           />
         )}
         {step === 'files' && <FilesStep basePath={basePath} draft={draft} onDraft={setDraft} />}
+        {step === 'images' && (
+          <ImagesStep
+            key={`${draft?.id ?? 'empty'}-${draft?.lectureFileName ?? 'no-source'}`}
+            basePath={basePath}
+            draft={draft}
+            onDraft={setDraft}
+          />
+        )}
         {step === 'design' && <DesignStep subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
-        {step === 'images' && <ImagesStep key={draft?.id ?? 'empty'} subject={subject} basePath={basePath} draft={draft} onDraft={setDraft} />}
       </section>
     </AcademicShell>
   );
@@ -289,9 +301,9 @@ function BuilderIntro({
 }) {
   const steps: Array<{ id: BuilderStep; label: string; href: string }> = [
     { id: 'agent', label: 'Agent', href: basePath },
-    { id: 'files', label: 'Files', href: `${basePath}/files` },
-    { id: 'design', label: 'Design', href: `${basePath}/design` },
+    { id: 'files', label: 'AI JSON', href: `${basePath}/files` },
     { id: 'images', label: 'Images', href: `${basePath}/images` },
+    { id: 'design', label: 'Design', href: `${basePath}/design` },
   ];
   const active = steps.findIndex((item) => item.id === step);
   return (
@@ -299,7 +311,7 @@ function BuilderIntro({
       <div>
         <span className="portal-kicker">AI AGENT STUDIO · {subject.code}</span>
         <h1>Build a lecture that feels made for your class.</h1>
-        <p>Bring your source material and an AI-agent output. Campus Hub turns them into a structured, interactive lesson.</p>
+        <p>Prepare the JSON with your agent, bring it back, then let Campus Hub extract and match the real lecture images.</p>
       </div>
       <nav className="agent-steps" aria-label="Lecture creation steps">
         {steps.map((item, index) => (
@@ -333,9 +345,9 @@ function AgentStep({
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const selected = agents.find((item) => item.id === agent) ?? agents[0];
+  const selected = agents.find((item) => item.id === agent);
   const prompt = useMemo(
-    () => `Read the entire attached lecture source and complete the attached Campus Hub v2 JSON schema. The Campus Hub subject ${subject.name} (${subject.code}) is only the publishing destination; it must never override the source topic. Determine the actual title, course, terminology, objectives, sections, subsections, glossary, summary, and metadata from the source. Preserve every meaningful concept, explanation, definition, example, quote, formula, code sample, table, data point, and important image; reorganize logically and merge repetition without losing information. Use only the nine content types defined in the schema and remove _instructions, imageLocationReference, and all placeholder examples from the final object. Do not invent facts, citations, links, or image paths. For a PDF, use media/page-001.jpg through media/page-024.jpg with the three-digit original page number. For PowerPoint use exact ppt/media paths, for Word use exact word/media paths, and for a direct image use its exact filename. Every image block needs src, alt, and a useful caption. Before finishing, compare the JSON against the source page by page and add anything omitted. Your entire response must be exactly one valid raw JSON object whose first character is { and last character is }. Do not create or return a ZIP, HTML template, schema file, Markdown file, sample, explanation, warning, greeting, code fence, or any text outside the completed JSON. If the source topic differs from ${subject.name}, build the lecture from the source anyway without refusing or asking a question.`,
+    () => `Read the entire attached lecture source and complete the attached Campus Hub v2 JSON template. The Campus Hub subject ${subject.name} (${subject.code}) is only the publishing destination; it must never override the source topic. Determine the actual title, course, terminology, objectives, sections, subsections, glossary, summary, and metadata from the source. Preserve every meaningful concept, explanation, definition, example, quote, formula, code sample, table, data point, and important image; reorganize logically and merge repetition without losing information. Use only the nine content types defined in the template and remove _instructions, imageLocationReference, and all placeholder examples from the final object. Do not extract, embed, encode, recreate, or download image files. For each important source image, create an image block with exactly four useful fields: src is the exact source location, title is a short image title, alt is an accessible visual description, and caption explains why the image matters. For a PDF, use media/page-001.jpg through the final source page, up to media/page-060.jpg, with the three-digit original page number. For PowerPoint use exact ppt/media paths, for Word use exact word/media paths, and for a direct image use its exact filename. Never invent facts, citations, links, or image paths. Before finishing, compare the JSON against the source page by page and add anything omitted. Your entire response must be exactly one valid raw JSON object whose first character is { and last character is }. Do not create or return a ZIP, HTML template, schema file, Markdown file, sample, explanation, warning, greeting, code fence, or any text outside the completed JSON. If the source topic differs from ${subject.name}, build the lecture from the source anyway without refusing or asking a question.`,
     [subject.code, subject.name],
   );
 
@@ -362,6 +374,10 @@ function AgentStep({
   }
 
   async function continueToFiles() {
+    if (!selected) {
+      setError('Choose an AI agent first.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -385,8 +401,8 @@ function AgentStep({
     <div className="agent-builder-card agent-choice-step">
       <div className="agent-choice-copy">
         <span className="agent-eyebrow"><Bot size={16} /> Step 1 · Choose your AI agent</span>
-        <h2>One prompt, your preferred workspace.</h2>
-        <p>Download the v2 JSON schema, then give it to your chosen agent together with the lecture source and the prompt below.</p>
+        <h2>Choose where the lecture JSON will be prepared.</h2>
+        <p>After you choose an agent, Campus Hub reveals the two items you must take with your lecture file.</p>
         <p><strong>Your uploaded source decides the lecture topic.</strong> {subject.name} is only where Campus Hub will publish the finished lecture.</p>
       </div>
       <div className="agent-toggle" role="radiogroup" aria-label="Choose your AI agent">
@@ -405,7 +421,7 @@ function AgentStep({
           </button>
         ))}
       </div>
-      <div className="agent-instructions">
+      {selected ? <div className="agent-instructions">
         <div className="agent-instructions-title">
           <span className="agent-count">01</span>
           <div>
@@ -413,30 +429,26 @@ function AgentStep({
             <p>{selected.note}</p>
           </div>
         </div>
-        <div className="prompt-box">
-          <p>{prompt}</p>
-          <div className="prompt-actions">
-            <button type="button" onClick={downloadContract}>
-              <Download size={16} /> Download v2 JSON schema
-            </button>
-            <button type="button" onClick={copyPrompt}>
-              {copied ? <Check size={16} /> : <Clipboard size={16} />}
-              {copied ? 'Prompt copied' : 'Copy prompt'}
-            </button>
-          </div>
+        <div className="agent-handoff-actions">
+          <button type="button" className="agent-handoff-button template" onClick={downloadContract}>
+            <span>A</span><FileJson size={23} /><div><small>JSON TEMPLATE</small><strong>Download template file</strong><p>Attach this file to {selected.name} without editing it.</p></div><Download size={18} />
+          </button>
+          <button type="button" className="agent-handoff-button prompt" onClick={copyPrompt}>
+            <span>B</span><Clipboard size={23} /><div><small>AI INSTRUCTIONS</small><strong>{copied ? 'Prompt copied' : 'Copy agent prompt'}</strong><p>Paste it into the same conversation with both files.</p></div>{copied ? <Check size={18} /> : <Clipboard size={18} />}
+          </button>
         </div>
         <ol className="agent-task-list">
-          <li><span>1</span><div><strong>Download the v2 JSON schema</strong><p>It defines objectives, nine content types, subsections, glossary, summary, and further reading.</p></div></li>
-          <li><span>2</span><div><strong>Attach all three inputs</strong><p>Open <a href={selected.url} target="_blank" rel="noreferrer">{selected.name} <ExternalLink size={13} /></a>, then attach your lecture source, the downloaded contract, and the copied prompt.</p></div></li>
-          <li><span>3</span><div><strong>Get raw JSON only</strong><p>The response must begin with {`{`} and end with {`}`}. Download it as a .json file, or paste it into Campus Hub on the next step.</p></div></li>
-          <li><span>4</span><div><strong>Upload source + JSON here</strong><p>Campus Hub matches each JSON image location to the real image extracted from the lecture source.</p></div></li>
+          <li><span>1</span><div><strong>Open {selected.name}</strong><p>Use <a href={selected.url} target="_blank" rel="noreferrer">the {selected.name} website <ExternalLink size={13} /></a>.</p></div></li>
+          <li><span>2</span><div><strong>Attach two files</strong><p>Add your original lecture file and the downloaded JSON template.</p></div></li>
+          <li><span>3</span><div><strong>Paste the prompt</strong><p>The agent fills the JSON with all lecture content and the exact locations of important images.</p></div></li>
+          <li><span>4</span><div><strong>Download the completed JSON</strong><p>The agent must return one JSON file only. Campus Hub—not the agent—extracts the images later.</p></div></li>
         </ol>
-      </div>
+      </div> : <div className="agent-awaiting-choice"><Bot size={21} /><div><strong>Select an agent to continue</strong><p>The download and copy buttons will appear here.</p></div></div>}
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">
         <a className="portal-secondary" href={`/app/subjects/${encodeURIComponent(subject.id)}/add-lecture`}>Choose another method</a>
-        <button className="portal-primary" type="button" onClick={continueToFiles} disabled={busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: upload files'} <ArrowRight size={17} />
+        <button className="portal-primary" type="button" onClick={continueToFiles} disabled={busy || !selected}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: import AI JSON'} <ArrowRight size={17} />
         </button>
       </div>
     </div>
@@ -452,12 +464,11 @@ function FilesStep({
   draft: Draft | null;
   onDraft: (draft: Draft) => void;
 }) {
-  const [lectureFile, setLectureFile] = useState<File | null>(null);
   const [agentFile, setAgentFile] = useState<File | null>(null);
   const [pastedJson, setPastedJson] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const ready = Boolean(draft?.lectureFileName && draft?.agentFileName);
+  const ready = Boolean(draft?.agentFileName && draft?.lesson);
 
   function usePastedJson() {
     const raw = pastedJson
@@ -478,37 +489,33 @@ function FilesStep({
     }
   }
 
-  async function saveFiles() {
+  async function saveJson() {
     if (!draft) {
       setError('Choose an AI agent first.');
       return;
     }
-    if (!lectureFile || !agentFile) {
+    if (!agentFile) {
       if (ready) {
-        window.location.assign(`${basePath}/design`);
+        window.location.assign(`${basePath}/images`);
         return;
       }
-      setError('Choose both the lecture source and the AI-agent output.');
+      setError('Choose the completed JSON file returned by your AI agent.');
       return;
     }
     setBusy(true);
     setError('');
     try {
-      const sourceFile = lectureFile.type === 'application/pdf' || lectureFile.name.toLowerCase().endsWith('.pdf')
-        ? await renderPdfAsImageArchive(lectureFile)
-        : lectureFile;
       const form = new FormData();
-      form.append('action', 'upload');
+      form.append('action', 'upload_agent_json');
       form.append('draftId', draft.id);
-      form.append('lectureFile', sourceFile);
       form.append('agentFile', agentFile);
       const response = await fetch('/api/lecture-builder', { method: 'POST', body: form });
       const result = await safeJson(response);
-      if (!response.ok) throw new Error(String(result.error || 'Unable to save the files.'));
+      if (!response.ok) throw new Error(String(result.error || 'Unable to validate the AI JSON.'));
       onDraft(result.draft as Draft);
-      window.location.assign(`${basePath}/design`);
+      window.location.assign(`${basePath}/images`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to save the files.');
+      setError(caught instanceof Error ? caught.message : 'Unable to validate the AI JSON.');
     } finally {
       setBusy(false);
     }
@@ -517,26 +524,16 @@ function FilesStep({
   return (
     <div className="agent-builder-card files-step">
       <div className="agent-choice-copy">
-        <span className="agent-eyebrow"><UploadCloud size={16} /> Step 2 · Bring the source back</span>
-        <h2>Upload the source and its completed v2 JSON.</h2>
-        <p>Campus Hub extracts the source images, validates every image location in the JSON, and keeps both files private to this draft.</p>
+        <span className="agent-eyebrow"><FileJson size={16} /> Step 2 · Import the AI result</span>
+        <h2>Bring back the completed JSON file.</h2>
+        <p>Campus Hub checks the structure and saves all lecture content. The original lecture file comes next, where the website extracts its images.</p>
       </div>
-      <div className="upload-grid">
-        <FilePicker
-          icon={FileText}
-          eyebrow="SOURCE FILE"
-          title="Your lecture file"
-          text="Use PDF, PPTX, DOCX, ZIP, or one image. PDF pages are converted privately in your browser into selectable source images."
-          file={lectureFile}
-          savedName={draft?.lectureFileName}
-          onChange={setLectureFile}
-          accept=".pdf,application/pdf,.pptx,.docx,.zip,.png,.jpg,.jpeg,.webp,.gif"
-        />
+      <div className="upload-grid single-upload">
         <FilePicker
           icon={FileArchive}
-          eyebrow="AGENT OUTPUT"
-          title="Your AI-agent output"
-          text="The one completed .json file the AI agent returned from the Campus Hub contract."
+          eyebrow="AI AGENT OUTPUT"
+          title="Completed lecture JSON"
+          text="Use the single .json file created by the AI agent from your lecture and the Campus Hub template."
           file={agentFile}
           savedName={draft?.agentFileName}
           onChange={setAgentFile}
@@ -545,8 +542,8 @@ function FilesStep({
       </div>
       <div className="json-paste-option">
         <div>
-          <span><FileJson size={17} /> Claude gave you text instead of a file?</span>
-          <p>Paste the raw JSON response here. Campus Hub will turn it into the required <code>.json</code> output file automatically.</p>
+          <span><FileJson size={17} /> Did the agent display JSON instead of downloading it?</span>
+          <p>Paste the raw response here and Campus Hub will create the required <code>.json</code> file for this step.</p>
         </div>
         <textarea
           value={pastedJson}
@@ -558,12 +555,12 @@ function FilesStep({
           <FileJson size={16} /> Use pasted JSON
         </button>
       </div>
-      <div className="upload-assurance"><CheckCircle2 size={17} /> Original files remain private. Only the image titles, captions, and selected extracted images appear in the published lecture.</div>
+      <div className="upload-assurance"><CheckCircle2 size={17} /> This step imports content and image locations only. No lecture image is extracted by the AI agent.</div>
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">
         <a className="portal-secondary" href={basePath}><ArrowLeft size={16} /> Back</a>
-        <button className="portal-primary" type="button" onClick={saveFiles} disabled={busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: choose design'} <ArrowRight size={17} />
+        <button className="portal-primary" type="button" onClick={saveJson} disabled={busy}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: import lecture & choose images'} <ArrowRight size={17} />
         </button>
       </div>
     </div>
@@ -616,8 +613,9 @@ function DesignStep({
   const [design, setDesign] = useState(draft?.design ?? 'atelier');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function saveDesign() {
-    if (!draft) return setError('Upload the two files before choosing a design.');
+  async function createLecture() {
+    if (!draft?.lectureFileName || !draft.agentFileName || !draft.lesson)
+      return setError('Import the completed JSON and lecture source before creating the lecture.');
     setBusy(true);
     setError('');
     try {
@@ -629,7 +627,14 @@ function DesignStep({
       const result = await safeJson(response);
       if (!response.ok) throw new Error(String(result.error || 'Unable to save the design.'));
       onDraft(result.draft as Draft);
-      window.location.assign(`${basePath}/images`);
+      const publishResponse = await fetch('/api/lecture-builder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'publish', draftId: draft.id }),
+      });
+      const publishResult = await safeJson(publishResponse);
+      if (!publishResponse.ok) throw new Error(String(publishResult.error || 'Unable to create the lecture.'));
+      window.location.assign(`/app/subjects/${encodeURIComponent(subject.id)}/lectures/${encodeURIComponent(String(publishResult.lectureId))}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save the design.');
     } finally {
@@ -639,7 +644,7 @@ function DesignStep({
   return (
     <div className="agent-builder-card design-step">
       <div className="agent-choice-copy">
-        <span className="agent-eyebrow"><Palette size={16} /> Step 3 · Choose the atmosphere</span>
+        <span className="agent-eyebrow"><Palette size={16} /> Step 4 · Choose the final design</span>
         <h2>Set the visual direction for {subject.code}.</h2>
         <p>The design carries into the published lecture and remains comfortable on every screen size.</p>
       </div>
@@ -661,9 +666,9 @@ function DesignStep({
       </div>
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">
-        <a className="portal-secondary" href={`${basePath}/files`}><ArrowLeft size={16} /> Back</a>
-        <button className="portal-primary" type="button" onClick={saveDesign} disabled={busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: select images'} <ArrowRight size={17} />
+        <a className="portal-secondary" href={`${basePath}/images`}><ArrowLeft size={16} /> Back to images</a>
+        <button className="portal-primary create-lecture-button" type="button" onClick={createLecture} disabled={busy}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Create interactive lecture
         </button>
       </div>
     </div>
@@ -671,93 +676,209 @@ function DesignStep({
 }
 
 function ImagesStep({
-  subject,
   basePath,
   draft,
   onDraft,
 }: {
-  subject: CampusState['subjects'][number];
   basePath: string;
   draft: Draft | null;
   onDraft: (draft: Draft) => void;
 }) {
   const images = getLectureImages(draft?.lesson);
+  const [lectureFile, setLectureFile] = useState<File | null>(null);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
   const [selected, setSelected] = useState<Record<string, string>>(
     () => Object.fromEntries(images.map((image) => [image.key, draft?.imageSelections[image.key] ?? image.location])),
   );
   const [busy, setBusy] = useState(false);
+  const [searching, setSearching] = useState<string[]>([]);
   const [error, setError] = useState('');
-  async function createLecture() {
-    if (!draft) return setError('Choose a design before creating the lecture.');
-    if (!draft.lesson || (images.length > 0 && !draft.imageManifest.length)) {
-      setError('Upload a completed JSON contract and a source file with embedded images first.');
+
+  async function uploadLecture() {
+    if (!draft?.lesson || !draft.agentFileName) {
+      setError('Import and validate the AI-agent JSON first.');
+      return;
+    }
+    if (!lectureFile) {
+      if (draft.lectureFileName) return;
+      setError('Choose the original lecture file so Campus Hub can extract its images.');
       return;
     }
     setBusy(true);
     setError('');
     try {
-      const imagesResponse = await fetch('/api/lecture-builder', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'update_images', draftId: draft.id, imageSelections: selected }),
-      });
-      const imagesResult = await safeJson(imagesResponse);
-      if (!imagesResponse.ok) throw new Error(String(imagesResult.error || 'Unable to save the image choices.'));
-      onDraft(imagesResult.draft as Draft);
-      const publishResponse = await fetch('/api/lecture-builder', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'publish', draftId: draft.id }),
-      });
-      const publishResult = await safeJson(publishResponse);
-      if (!publishResponse.ok) throw new Error(String(publishResult.error || 'Unable to create the lecture.'));
-      window.location.assign(`/app/subjects/${encodeURIComponent(subject.id)}/lectures/${encodeURIComponent(String(publishResult.lectureId))}`);
+      const sourceFile = lectureFile.type === 'application/pdf' || lectureFile.name.toLowerCase().endsWith('.pdf')
+        ? await renderPdfAsImageArchive(lectureFile)
+        : lectureFile;
+      const form = new FormData();
+      form.append('action', 'upload_source');
+      form.append('draftId', draft.id);
+      form.append('lectureFile', sourceFile);
+      form.append('originalFileName', lectureFile.name);
+      const response = await fetch('/api/lecture-builder', { method: 'POST', body: form });
+      const result = await safeJson(response);
+      if (!response.ok) throw new Error(String(result.error || 'Unable to extract the lecture images.'));
+      onDraft(result.draft as Draft);
+      window.location.assign(`${basePath}/images`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to create the lecture.');
+      setError(caught instanceof Error ? caught.message : 'Unable to extract the lecture images.');
     } finally {
       setBusy(false);
     }
   }
+
+  async function findGoogleAlternative(referenceKey: string) {
+    if (!draft?.lectureFileName) {
+      setError('Import the lecture file before requesting image alternatives.');
+      return null;
+    }
+    setSearching((current) => [...current, referenceKey]);
+    setError('');
+    try {
+      const response = await fetch('/api/lecture-builder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'search_google_image',
+          draftId: draft.id,
+          referenceKey,
+          geminiApiKey: geminiApiKey.trim() || undefined,
+        }),
+      });
+      const result = await safeJson(response);
+      if (!response.ok) throw new Error(String(result.error || 'Gemini could not prepare an image alternative.'));
+      const nextDraft = result.draft as Draft;
+      onDraft(nextDraft);
+      return nextDraft;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Gemini could not prepare an image alternative.');
+      return null;
+    } finally {
+      setSearching((current) => current.filter((key) => key !== referenceKey));
+    }
+  }
+
+  async function findAllGoogleAlternatives() {
+    if (!images.length) return;
+    setBusy(true);
+    try {
+      for (const reference of images) {
+        const hasAlternative = draft?.imageManifest.some(
+          (candidate) => candidate.origin === 'google' && candidate.referenceKey === reference.key,
+        );
+        if (!hasAlternative) await findGoogleAlternative(reference.key);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function continueToDesign() {
+    if (!draft?.lectureFileName || !draft.lesson) {
+      setError('Import the original lecture file before continuing.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/lecture-builder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'update_images', draftId: draft.id, imageSelections: selected }),
+      });
+      const result = await safeJson(response);
+      if (!response.ok) throw new Error(String(result.error || 'Unable to save the image choices.'));
+      onDraft(result.draft as Draft);
+      window.location.assign(`${basePath}/design`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save the image choices.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="agent-builder-card images-step">
       <div className="agent-choice-copy">
-        <span className="agent-eyebrow"><ImagePlus size={16} /> Step 4 · Shape the visual story</span>
-        <h2>Confirm the real source image for every section.</h2>
-        <p>The title and caption come directly from your AI-agent JSON. Campus Hub has extracted the images from your uploaded lecture source; keep the matched one or select another extracted image.</p>
+        <span className="agent-eyebrow"><ImagePlus size={16} /> Step 3 · Extract and choose images</span>
+        <h2>Let Campus Hub find every image named in the JSON.</h2>
+        <p>Import the original lecture. Campus Hub extracts the exact images at the recorded locations, then Gemini can create additional grounded alternatives using Google Search for each image title.</p>
       </div>
-      {images.length ? (
+
+      <div className="image-source-workspace">
+        <FilePicker
+          icon={FileText}
+          eyebrow="ORIGINAL LECTURE"
+          title="Import lecture file"
+          text="Use PDF, PPTX, DOCX, ZIP, or one image. Campus Hub—not the AI agent—extracts the images."
+          file={lectureFile}
+          savedName={draft?.lectureFileName}
+          onChange={setLectureFile}
+          accept=".pdf,application/pdf,.pptx,.docx,.zip,.png,.jpg,.jpeg,.webp,.gif"
+        />
+        <div className="image-extraction-status">
+          <span><ImagePlus size={19} /> SOURCE IMAGE EXTRACTION</span>
+          <h3>{draft?.lectureFileName ? `${draft.imageManifest.filter((image) => image.origin !== 'google').length} source images ready` : 'Waiting for the lecture file'}</h3>
+          <p>The saved JSON currently requests {images.length} important {images.length === 1 ? 'image' : 'images'} by exact location.</p>
+          <button className="portal-primary" type="button" onClick={uploadLecture} disabled={busy || (!lectureFile && Boolean(draft?.lectureFileName))}>
+            {busy ? <LoaderCircle className="spin" size={17} /> : <UploadCloud size={17} />}
+            {draft?.lectureFileName ? 'Replace & extract again' : 'Import & extract images'}
+          </button>
+        </div>
+      </div>
+
+      {draft?.lectureFileName && images.length > 0 && (
+        <div className="gemini-image-search-panel">
+          <div><span><Sparkles size={17} /> GEMINI + GOOGLE SEARCH</span><h3>Add grounded visual alternatives</h3><p>Campus Hub keeps the exact extracted image in every slide. Add your Gemini API key only when the site does not already have one connected; it is used for this request and is never saved.</p></div>
+          <label><KeyRound size={16} /><input type="password" value={geminiApiKey} onChange={(event) => setGeminiApiKey(event.target.value)} placeholder="Optional Gemini API key" autoComplete="off" /></label>
+          <button className="portal-secondary" type="button" onClick={findAllGoogleAlternatives} disabled={busy || searching.length > 0}>
+            {busy || searching.length ? <LoaderCircle className="spin" size={16} /> : <Search size={16} />} Find alternatives for all titles
+          </button>
+        </div>
+      )}
+
+      {draft?.lectureFileName && images.length ? (
         <div className="image-selection-list">
-          {images.map((imageReference, groupIndex) => (
+          {images.map((imageReference, groupIndex) => {
+            const candidates = draft.imageManifest.filter((candidate) =>
+              candidate.sourceLocation === imageReference.location ||
+              (candidate.origin === 'google' && candidate.referenceKey === imageReference.key),
+            );
+            const suggestions = [...new Set(candidates.map((candidate) => candidate.searchSuggestions).filter(Boolean))] as string[];
+            return (
             <section className="image-selection-group source-image-group" key={imageReference.key}>
-              <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><div><h3>{imageReference.title}</h3><p>{imageReference.caption}</p></div><small>Source: {imageReference.location}</small></div>
+              <div className="image-selection-head"><span>{String(groupIndex + 1).padStart(2, '0')}</span><div><h3>{imageReference.title}</h3><p>{imageReference.caption}</p></div><small>Location: {imageReference.location}</small></div>
               <div className="image-slider" aria-label={`Select the image for ${imageReference.title}`}>
-                {draft!.imageManifest.map((image) => (
+                {candidates.map((image) => (
                   <button
                     type="button"
-                    className={selected[imageReference.key] === image.sourceLocation ? 'source-image-choice selected' : 'source-image-choice'}
+                    className={`${selected[imageReference.key] === image.sourceLocation ? 'source-image-choice selected' : 'source-image-choice'}${image.origin === 'google' ? ' google-image-choice' : ''}`}
                     key={image.sourceLocation}
                     onClick={() => setSelected((current) => ({ ...current, [imageReference.key]: image.sourceLocation }))}
                     aria-pressed={selected[imageReference.key] === image.sourceLocation}
                   >
-                    <img src={image.url} alt="" />
-                    <span>{selected[imageReference.key] === image.sourceLocation ? <><Check size={15} /> Selected source image</> : image.sourceLocation}</span>
+                    <img src={image.url} alt={imageReference.title} />
+                    <span>{selected[imageReference.key] === image.sourceLocation ? <><Check size={15} /> Selected</> : image.origin === 'google' ? 'Gemini + Google alternative' : 'Extracted lecture image'}</span>
                   </button>
                 ))}
+                <button className="google-search-more" type="button" onClick={() => void findGoogleAlternative(imageReference.key)} disabled={searching.includes(imageReference.key)}>
+                  {searching.includes(imageReference.key) ? <LoaderCircle className="spin" size={22} /> : <Search size={22} />}<strong>Find another</strong><span>Gemini + Google Search</span>
+                </button>
               </div>
+              {suggestions.map((html, index) => <div className="google-search-suggestions" key={index} dangerouslySetInnerHTML={{ __html: html }} />)}
             </section>
-          ))}
+          )})}
         </div>
-      ) : draft?.lesson ? (
-        <div className="contract-empty"><CheckCircle2 size={20} /><div><strong>This lecture does not require source images.</strong><p>You can create the complete text, table, formula, code, glossary, and summary experience now.</p></div></div>
+      ) : draft?.lectureFileName && draft?.lesson ? (
+        <div className="contract-empty"><CheckCircle2 size={20} /><div><strong>This lecture does not request images.</strong><p>The original source is saved. You can continue to design the complete text, table, formula, code, glossary, and summary experience.</p></div></div>
       ) : (
-        <div className="contract-empty"><FileArchive size={20} /><div><strong>Your JSON contract is not ready yet.</strong><p>Go back and upload the original lecture source plus the completed JSON file from your AI agent.</p></div></div>
+        <div className="contract-empty"><FileArchive size={20} /><div><strong>The original lecture is still needed.</strong><p>Import it above. Campus Hub will verify every JSON location and extract the matching image itself.</p></div></div>
       )}
-      <div className="creation-note"><Sparkles size={17} /><span>Ready to create: {subject.name} will be published as a responsive, interactive lecture.</span></div>
       {error && <p className="agent-form-error">{error}</p>}
       <div className="agent-builder-actions">
-        <a className="portal-secondary" href={`${basePath}/design`}><ArrowLeft size={16} /> Back</a>
-        <button className="portal-primary create-lecture-button" type="button" onClick={createLecture} disabled={busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />} Create interactive lecture
+        <a className="portal-secondary" href={`${basePath}/files`}><ArrowLeft size={16} /> Back to AI JSON</a>
+        <button className="portal-primary" type="button" onClick={continueToDesign} disabled={busy || !draft?.lectureFileName}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : 'Next: choose design'} <ArrowRight size={17} />
         </button>
       </div>
     </div>

@@ -144,6 +144,7 @@ export type CampusEnv = {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   APP_URL?: string;
+  GEMINI_API_KEY?: string;
 };
 
 export function getEnv() {

@@ -26,6 +26,7 @@ export type CodeBlock = { type: 'code'; language?: string; code: string };
 export type ImageBlock = {
   type: 'image';
   src: string;
+  title?: string;
   alt: string;
   caption?: string;
   sourceLocation?: string;
@@ -142,7 +143,7 @@ export function getLectureImages(lesson: LessonContract | null | undefined): Lec
       const index = references.length;
       references.push({
         key: referenceKey(parts, index),
-        title: block.caption || block.alt || `Source image ${index + 1}`,
+        title: block.title || block.alt || `Source image ${index + 1}`,
         caption: block.caption || block.alt,
         location: block.sourceLocation || block.src,
         alt: block.alt,
