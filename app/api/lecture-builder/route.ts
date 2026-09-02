@@ -43,6 +43,16 @@ type SourceImage = {
 };
 type ExtractedImage = Omit<SourceImage, 'objectKey'> & { data: Uint8Array };
 
+/**
+ * Keep binary image bytes out of D1 JSON columns. The bytes are uploaded to R2
+ * separately; putting them in `image_manifest` can exceed D1's 32 MiB RPC
+ * serialization limit for a multi-page PDF.
+ */
+function manifestImage(image: ExtractedImage, objectKey: string, origin: 'source' | 'google' = 'source'): SourceImage {
+  const { data: _data, ...metadata } = image;
+  return { ...metadata, objectKey, origin };
+}
+
 function isManager(role: string) { return role === 'representative' || role === 'admin'; }
 function safeText(value: unknown, maximum = 800) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maximum) : '';
@@ -596,7 +606,7 @@ export async function POST(request: Request) {
             httpMetadata: { contentType: image.contentType },
             customMetadata: { owner: viewer.id, draftId: draft.id, sourceLocation: image.sourceLocation },
           });
-          manifest.push({ ...image, objectKey, origin: 'source' });
+          manifest.push(manifestImage(image, objectKey));
         }
         const selections = Object.fromEntries(getLectureImages(lesson).map((image) => [image.key, image.location]));
         await db.prepare(`UPDATE lecture_drafts SET lecture_file_key=?,lecture_file_name=?,image_manifest=?,lesson_json=?,image_selections=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
@@ -646,7 +656,7 @@ export async function POST(request: Request) {
           const objectKey = `${prefix}/extracted/${crypto.randomUUID()}-${safeFileName(image.fileName)}`;
           createdKeys.push(objectKey);
           await getEnv().FILES.put(objectKey, image.data, { httpMetadata: { contentType: image.contentType }, customMetadata: { owner: viewer.id, draftId: draft.id, sourceLocation: image.sourceLocation } });
-          manifest.push({ ...image, objectKey });
+          manifest.push(manifestImage(image, objectKey));
         }
         const selections = Object.fromEntries(getLectureImages(lesson).map((image) => [image.key, image.location]));
         await db.prepare(`UPDATE lecture_drafts SET lecture_file_key=?,lecture_file_name=?,agent_file_key=?,agent_file_name=?,image_manifest=?,lesson_json=?,image_selections=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
