@@ -51,3 +51,5 @@ Then register `/api/donations/webhook` as a Stripe webhook endpoint for the `che
 ## Continuous deployment
 
 Connect this repository in Cloudflare Workers Builds. Use `pnpm run deploy` as the deploy command and `main` as the production branch. D1 migrations should be reviewed and applied before an incompatible schema release.
+
+Cloudflare deployment trigger.
