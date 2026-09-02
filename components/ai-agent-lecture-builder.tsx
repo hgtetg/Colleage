@@ -93,8 +93,23 @@ const designs = [
   },
 ];
 
-function safeJson(response: Response) {
-  return response.json() as Promise<Record<string, unknown>>;
+async function safeJson(response: Response): Promise<Record<string, unknown>> {
+  const text = await response.text();
+  if (!text.trim()) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html') || /^\s*</.test(text)) {
+      throw new Error(response.status === 413
+        ? 'The lecture upload is too large for this deployment. Use a smaller source file or fewer pages.'
+        : `Campus Hub returned an unexpected HTML response (HTTP ${response.status}). Please refresh and try again.`);
+    }
+    throw new Error(`Campus Hub returned an invalid response (HTTP ${response.status}). Please try again.`);
+  }
 }
 
 function lectureJsonContract() {
